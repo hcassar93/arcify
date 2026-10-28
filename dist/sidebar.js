@@ -1,3 +1,218 @@
+// src/icons.ts
+var paths = {
+  search: "m14 14-4-4 M11.5 6.5a5 5 0 1 1-10 0 5 5 0 0 1 10 0",
+  folder: "M1 3h5l2 2h7v9H1Z",
+  chevron: "m6 4 4 4-4 4",
+  down: "m4 6 4 4 4-4",
+  plus: "M8 3v10 M3 8h10",
+  settings: "M8 2v2 M8 12v2 M2 8h2 M12 8h2 M3.8 3.8l1.4 1.4 M10.8 10.8l1.4 1.4 M3.8 12.2l1.4-1.4 M10.8 5.2l1.4-1.4 M11 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0",
+  fullscreen: "M6 2H2v4 M10 2h4v4 M14 10v4h-4 M2 10v4h4",
+  close: "m4 4 8 8 M12 4l-8 8",
+  panel: "M2 3h12v10H2Z M6 3v10",
+  more: "M3 8h.01 M8 8h.01 M13 8h.01",
+  command: "M5 5h6v6H5Z M5 5H3a2 2 0 1 1 2-2v2 M11 5V3a2 2 0 1 1 2 2h-2 M11 11h2a2 2 0 1 1-2 2v-2 M5 11v2a2 2 0 1 1-2-2h2",
+  pin: "m5 2 6 0-1 5 3 3H3l3-3Z M8 10v4",
+  arrow: "M3 8h10 M9 4l4 4-4 4"
+};
+function icon(name) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("width", "16");
+  svg.setAttribute("height", "16");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "1.5");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("aria-hidden", "true");
+  svg.classList.add("ui-icon");
+  const path = document.createElementNS(svg.namespaceURI, "path");
+  path.setAttribute("d", paths[name] ?? paths.arrow);
+  svg.append(path);
+  return svg;
+}
+var packagedSites = {
+  "github.com": "github.png",
+  "mail.google.com": "gmail.png",
+  "calendar.google.com": "calendar.png",
+  "notion.so": "notion.png",
+  "www.notion.so": "notion.png",
+  "notion.com": "notion.png",
+  "www.notion.com": "notion.png"
+};
+function siteAsset(url) {
+  try {
+    const u = new URL(url ?? "");
+    if (!["https:", "http:"].includes(u.protocol)) return;
+    const file = packagedSites[u.hostname];
+    return file ? "site-icons/" + file : void 0;
+  } catch {
+    return;
+  }
+}
+function cachedIconURL(url, getURL) {
+  try {
+    const page = new URL(url ?? "");
+    if (!["http:", "https:"].includes(page.protocol) || page.username || page.password)
+      return;
+    const endpoint = new URL(getURL("_favicon/"));
+    endpoint.searchParams.set("pageUrl", page.href);
+    endpoint.searchParams.set("size", "32");
+    return endpoint.href;
+  } catch {
+    return;
+  }
+}
+function siteIcon(title, url, override, image) {
+  const box = document.createElement("span");
+  box.className = "site-icon";
+  box.setAttribute("aria-hidden", "true");
+  const monogram2 = () => {
+    box.replaceChildren();
+    box.classList.remove("cached", "packaged");
+    delete box.dataset.site;
+    box.textContent = override || [...title.trim()][0]?.toUpperCase() || "\u2022";
+    box.classList.add(override ? "emoji" : "monogram");
+    let hash = 0;
+    for (const c of url ?? title) hash = hash * 31 + c.charCodeAt(0) >>> 0;
+    box.dataset.tint = String(hash % 6);
+  };
+  if (image) {
+    const img2 = document.createElement("img");
+    img2.alt = "";
+    img2.src = image;
+    img2.onerror = monogram2;
+    box.append(img2);
+    return box;
+  }
+  if (override) {
+    monogram2();
+    return box;
+  }
+  const img = document.createElement("img");
+  img.alt = "";
+  img.width = 20;
+  img.height = 20;
+  const packaged = () => {
+    const asset = siteAsset(url);
+    box.classList.remove("cached");
+    if (!asset) {
+      monogram2();
+      return;
+    }
+    box.classList.add("packaged");
+    box.dataset.site = asset.split("/").at(-1)?.split(".")[0] ?? "";
+    img.onerror = () => {
+      img.onerror = null;
+      monogram2();
+    };
+    img.src = asset;
+    box.replaceChildren(img);
+  };
+  const cached = typeof chrome !== "undefined" && chrome.runtime?.getURL ? cachedIconURL(url, chrome.runtime.getURL) : void 0;
+  if (cached) {
+    box.classList.add("cached");
+    img.onerror = packaged;
+    img.src = cached;
+    box.append(img);
+  } else packaged();
+  return box;
+}
+
+// src/tree-view.ts
+var PAGE_SIZE = 80;
+function treeRows(children, expanded, favourites, active) {
+  const rows = [];
+  const activeChild = (nodes) => {
+    for (const n of nodes) {
+      if (n.url && active.has(n.id) && !favourites.has(n.id)) return n;
+      const child = activeChild(n.children ?? []);
+      if (child) return child;
+    }
+    return void 0;
+  };
+  const visit = (nodes, depth) => {
+    for (const node of nodes) {
+      if (node.url && favourites.has(node.id)) continue;
+      rows.push({ node, depth, contextual: false });
+      if (!node.url) {
+        if (expanded.has(node.id)) visit(node.children ?? [], depth + 1);
+        else {
+          const child = activeChild(node.children ?? []);
+          if (child)
+            rows.push({ node: child, depth: depth + 1, contextual: true });
+        }
+      }
+    }
+  };
+  visit(children, 0);
+  return rows;
+}
+function pageRange(length, page, size = PAGE_SIZE) {
+  const pages = Math.max(1, Math.ceil(length / size));
+  const safe = Math.max(0, Math.min(page, pages - 1));
+  return {
+    page: safe,
+    start: safe * size,
+    end: Math.min(length, (safe + 1) * size),
+    pages
+  };
+}
+
+// src/appearance.ts
+function validateAppearance(raw) {
+  if (!raw || typeof raw !== "object") return {};
+  const v = raw, out = {};
+  if (v.name !== void 0) {
+    if (typeof v.name !== "string" || v.name.length > 120)
+      throw new Error("Display names must be at most 120 characters.");
+    if (v.name.trim()) out.name = v.name.trim();
+  }
+  if (v.emoji !== void 0) {
+    if (typeof v.emoji !== "string" || v.emoji.length > 16)
+      throw new Error("Choose a short icon or emoji.");
+    if (v.emoji.trim()) out.emoji = v.emoji.trim();
+  }
+  if (v.image !== void 0) {
+    if (typeof v.image !== "string" || v.image.length > 1e5 || !/^data:image\/png;base64,iVBORw0KGgo[A-Za-z0-9+/=]+$/.test(v.image))
+      throw new Error("Choose a validated PNG image.");
+    out.image = v.image;
+  }
+  return out;
+}
+function readAppearances(raw) {
+  const result = {};
+  if (!raw || typeof raw !== "object") return result;
+  for (const [id, value] of Object.entries(raw)) {
+    if (["__proto__", "constructor", "prototype"].includes(id)) continue;
+    try {
+      result[id] = validateAppearance(value);
+    } catch {
+    }
+  }
+  return JSON.stringify(result).length <= 2e6 ? result : {};
+}
+async function localImage(file) {
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 2e6)
+    throw new Error("Choose a PNG, JPEG or WebP smaller than 2 MB.");
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const valid = file.type === "image/png" ? bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71 : file.type === "image/jpeg" ? bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 : String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
+  if (!valid) throw new Error("The file contents do not match its image type.");
+  const bitmap = await createImageBitmap(file);
+  try {
+    if (!bitmap.width || !bitmap.height || bitmap.width > 4096 || bitmap.height > 4096)
+      throw new Error("Images must be no larger than 4096 \xD7 4096.");
+    const canvas = document.createElement("canvas");
+    const scale = Math.min(1, 128 / Math.max(bitmap.width, bitmap.height));
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return validateAppearance({ image: canvas.toDataURL("image/png") }).image;
+  } finally {
+    bitmap.close();
+  }
+}
+
 // src/model.ts
 var defaults = {
   schemaVersion: 1,
@@ -19,6 +234,7 @@ function migrate(raw) {
   const p = raw && typeof raw === "object" ? raw : {};
   return {
     ...defaults,
+    customizations: readAppearances(p.customizations),
     bookmarkRootId: typeof p.bookmarkRootId === "string" ? p.bookmarkRootId : null,
     favourites: ids(p.favourites).slice(0, 12),
     expanded: ids(p.expanded),
@@ -61,6 +277,7 @@ function readSession(raw) {
       )
     );
   }
+  result.tabCustomizations = readAppearances(s.tabCustomizations);
   result.mru = Array.isArray(s.mru) ? [
     ...new Set(
       s.mru.filter((id) => Number.isInteger(id) && id >= 0)
@@ -74,65 +291,333 @@ function readSession(raw) {
   return result;
 }
 
+// src/stores.ts
+var BookmarkStore = class {
+  nodes = /* @__PURE__ */ new Map();
+  changed = /* @__PURE__ */ new Set();
+  removed = /* @__PURE__ */ new Set();
+  roots = [];
+  constructor(tree = []) {
+    this.reset(tree);
+  }
+  reset(tree) {
+    for (const id of this.nodes.keys()) this.removed.add(id);
+    this.nodes.clear();
+    this.roots = structuredClone(tree);
+    for (const n of this.roots) this.index(n, "");
+  }
+  index(node, path) {
+    const saved = Object.assign(node, { path });
+    this.nodes.set(node.id, saved);
+    this.changed.add(node.id);
+    this.removed.delete(node.id);
+    for (const child of node.children ?? [])
+      this.index(child, [path, node.title].filter(Boolean).join(" / "));
+  }
+  siblings(parentId) {
+    if (!parentId) return this.roots;
+    const parent = this.nodes.get(parentId);
+    if (!parent) throw new Error("Missing bookmark parent");
+    return parent.children ?? (parent.children = []);
+  }
+  reindex(children) {
+    children.forEach((n, index) => {
+      if (n.index !== index) {
+        n.index = index;
+        this.changed.add(n.id);
+      }
+    });
+  }
+  create(node) {
+    if (this.nodes.has(node.id)) this.remove(node.id);
+    const siblings = this.siblings(node.parentId);
+    siblings.splice(
+      Math.min(node.index ?? siblings.length, siblings.length),
+      0,
+      structuredClone(node)
+    );
+    const added = siblings.find((n) => n.id === node.id);
+    const parent = this.nodes.get(node.parentId ?? "");
+    this.index(
+      added,
+      parent ? [parent.path, parent.title].filter(Boolean).join(" / ") : ""
+    );
+    this.reindex(siblings);
+  }
+  update(id, change) {
+    const node = this.nodes.get(id);
+    if (!node) throw new Error("Missing bookmark");
+    Object.assign(node, change);
+    this.index(node, node.path);
+  }
+  remove(id) {
+    const node = this.nodes.get(id);
+    if (!node) return;
+    const siblings = this.siblings(node.parentId);
+    const i = siblings.findIndex((n) => n.id === id);
+    if (i >= 0) siblings.splice(i, 1);
+    const remove = (n) => {
+      for (const child of n.children ?? []) remove(child);
+      this.nodes.delete(n.id);
+      this.changed.delete(n.id);
+      this.removed.add(n.id);
+    };
+    remove(node);
+    this.reindex(siblings);
+  }
+  move(id, parentId, index) {
+    const node = this.nodes.get(id);
+    if (!node) throw new Error("Missing moved bookmark");
+    const old = this.siblings(node.parentId);
+    old.splice(
+      old.findIndex((n) => n.id === id),
+      1
+    );
+    this.reindex(old);
+    node.parentId = parentId;
+    const target = this.siblings(parentId);
+    target.splice(Math.min(index, target.length), 0, node);
+    this.reindex(target);
+    const parent = this.nodes.get(parentId);
+    this.index(node, [parent.path, parent.title].filter(Boolean).join(" / "));
+  }
+  reorder(parentId, ids2) {
+    const siblings = this.siblings(parentId);
+    const rank = new Map(ids2.map((id, i) => [id, i]));
+    siblings.sort((a, b) => (rank.get(a.id) ?? 1e9) - (rank.get(b.id) ?? 1e9));
+    this.reindex(siblings);
+  }
+  drain() {
+    const value = { changed: [...this.changed], removed: [...this.removed] };
+    this.changed.clear();
+    this.removed.clear();
+    return value;
+  }
+};
+var TabStore = class {
+  nodes = /* @__PURE__ */ new Map();
+  changed = /* @__PURE__ */ new Set();
+  removed = /* @__PURE__ */ new Set();
+  constructor(tabs = []) {
+    for (const tab of tabs) this.upsert(tab);
+  }
+  upsert(tab) {
+    if (tab.id === void 0) return;
+    this.nodes.set(tab.id, { ...tab });
+    this.changed.add(tab.id);
+    this.removed.delete(tab.id);
+  }
+  insert(tab) {
+    if (tab.id === void 0) return;
+    const siblings = [...this.nodes.values()].filter((t) => t.windowId === tab.windowId && t.id !== tab.id).sort((a, b) => a.index - b.index);
+    siblings.splice(Math.min(tab.index, siblings.length), 0, tab);
+    siblings.forEach((t, index) => {
+      if (t.id === tab.id || t.index !== index) this.upsert({ ...t, index });
+    });
+  }
+  remove(id) {
+    const removed = this.nodes.get(id);
+    this.nodes.delete(id);
+    this.changed.delete(id);
+    this.removed.add(id);
+    if (removed)
+      [...this.nodes.values()].filter((t) => t.windowId === removed.windowId).sort((a, b) => a.index - b.index).forEach((t, index) => {
+        if (t.index !== index) this.upsert({ ...t, index });
+      });
+  }
+  activate(id, windowId2) {
+    for (const tab of this.nodes.values())
+      if (tab.windowId === windowId2 && tab.active !== (tab.id === id))
+        this.upsert({ ...tab, active: tab.id === id });
+  }
+  move(id, windowId2, index) {
+    const tab = this.nodes.get(id);
+    if (!tab) return;
+    const siblings = [...this.nodes.values()].filter((t) => t.windowId === windowId2 && t.id !== id).sort((a, b) => a.index - b.index);
+    siblings.splice(index, 0, { ...tab, windowId: windowId2 });
+    siblings.forEach((t, index2) => {
+      if (t.index !== index2 || t.id === id) this.upsert({ ...t, index: index2 });
+    });
+  }
+  drain() {
+    const value = { changed: [...this.changed], removed: [...this.removed] };
+    this.changed.clear();
+    this.removed.clear();
+    return value;
+  }
+};
+
 // src/browser.ts
-async function snapshot() {
-  const [local, session, tree, tabs, win, shortcuts] = await Promise.all([
+var init;
+var bookmarkStore = new BookmarkStore();
+var tabStore = new TabStore();
+var prefs = migrate(null);
+var session = readSession(null);
+var windowId;
+var shortcuts = [];
+var initial = true;
+var sessionChanged = true;
+var preferencesChanged = true;
+var hydrated = false;
+var pending = [];
+var subscribers = /* @__PURE__ */ new Set();
+var timer;
+var notify = () => {
+  if (timer) return;
+  timer = setTimeout(() => {
+    timer = void 0;
+    for (const fn of subscribers) fn();
+  }, 40);
+};
+var recovering = false;
+async function recover() {
+  if (recovering) return;
+  recovering = true;
+  try {
+    bookmarkStore.reset(await chrome.bookmarks.getTree());
+    notify();
+  } finally {
+    recovering = false;
+  }
+}
+var apply = (fn) => {
+  if (!hydrated) {
+    pending.push(fn);
+    return;
+  }
+  try {
+    fn();
+    notify();
+  } catch {
+    void recover();
+  }
+};
+async function refreshTab(id) {
+  try {
+    const tab = await chrome.tabs.get(id);
+    const win = await chrome.windows.get(tab.windowId);
+    apply(
+      () => win.type === "normal" ? tabStore.nodes.has(id) ? tabStore.upsert(tab) : tabStore.insert(tab) : tabStore.remove(id)
+    );
+  } catch {
+    apply(() => tabStore.remove(id));
+  }
+}
+function start() {
+  if (init) return init;
+  chrome.bookmarks.onCreated.addListener(
+    (_id, node) => apply(() => bookmarkStore.create(node))
+  );
+  chrome.bookmarks.onChanged.addListener(
+    (id, change) => apply(() => bookmarkStore.update(id, change))
+  );
+  chrome.bookmarks.onMoved.addListener(
+    (id, info) => apply(() => bookmarkStore.move(id, info.parentId, info.index))
+  );
+  chrome.bookmarks.onRemoved.addListener(
+    (id) => apply(() => bookmarkStore.remove(id))
+  );
+  chrome.bookmarks.onChildrenReordered.addListener(
+    (id, info) => apply(() => bookmarkStore.reorder(id, info.childIds))
+  );
+  chrome.tabs.onCreated.addListener((tab) => {
+    if (tab.id !== void 0) void refreshTab(tab.id);
+  });
+  chrome.tabs.onUpdated.addListener((id, _change, tab) => {
+    if (tabStore.nodes.has(id)) apply(() => tabStore.upsert(tab));
+    else void refreshTab(id);
+  });
+  chrome.tabs.onRemoved.addListener((id) => apply(() => tabStore.remove(id)));
+  chrome.tabs.onMoved.addListener(
+    (id, info) => apply(() => tabStore.move(id, info.windowId, info.toIndex))
+  );
+  chrome.tabs.onActivated.addListener(
+    (info) => apply(() => tabStore.activate(info.tabId, info.windowId))
+  );
+  chrome.tabs.onDetached.addListener((id) => apply(() => tabStore.remove(id)));
+  chrome.tabs.onAttached.addListener((id) => void refreshTab(id));
+  chrome.tabs.onReplaced.addListener((added, removed) => {
+    apply(() => tabStore.remove(removed));
+    void refreshTab(added);
+  });
+  chrome.storage.onChanged.addListener(
+    (changes, area) => apply(() => {
+      if (area === "local" && changes.preferences) {
+        prefs = migrate(changes.preferences.newValue);
+        preferencesChanged = true;
+      }
+      if (area === "session" && changes.session) {
+        session = readSession(changes.session.newValue);
+        sessionChanged = true;
+      }
+    })
+  );
+  init = Promise.all([
     chrome.storage.local.get("preferences"),
     chrome.storage.session.get("session"),
     chrome.bookmarks.getTree(),
     chrome.tabs.query({ windowType: "normal" }),
     chrome.windows.getCurrent(),
     chrome.commands.getAll()
-  ]);
-  const prefs = migrate(local.preferences);
-  if (!prefs.bookmarkRootId)
-    prefs.bookmarkRootId = flatten(tree).find((n) => n.folderType === "bookmarks-bar")?.id ?? null;
+  ]).then(([local, stored, tree, tabs, win, bindings]) => {
+    prefs = migrate(local.preferences);
+    session = readSession(stored.session);
+    bookmarkStore = new BookmarkStore(tree);
+    tabStore = new TabStore(tabs);
+    windowId = win.id;
+    shortcuts = bindings;
+    hydrated = true;
+    for (const fn of pending.splice(0)) apply(fn);
+  });
+  return init;
+}
+async function snapshot() {
+  await start();
+  const b = bookmarkStore.drain(), t = tabStore.drain();
+  const effective = { ...prefs };
+  if (!effective.bookmarkRootId)
+    effective.bookmarkRootId = [...bookmarkStore.nodes.values()].find(
+      (n) => n.folderType === "bookmarks-bar"
+    )?.id ?? null;
+  const tabs = [...tabStore.nodes.values()];
+  const changes = {
+    bookmarks: b.changed,
+    removedBookmarks: b.removed,
+    tabs: t.changed,
+    removedTabs: t.removed,
+    session: sessionChanged,
+    preferences: preferencesChanged,
+    initial
+  };
+  initial = false;
+  sessionChanged = false;
+  preferencesChanged = false;
   return {
-    prefs,
-    session: readSession(session.session),
-    tree,
+    prefs: effective,
+    needsSetup: prefs.bookmarkRootId === null,
+    session,
+    tree: bookmarkStore.roots,
     tabs,
-    windowId: win.id,
-    active: tabs.find((t) => t.windowId === win.id && t.active),
-    shortcuts
+    windowId,
+    active: tabs.find((t2) => t2.windowId === windowId && t2.active),
+    shortcuts,
+    bookmarks: bookmarkStore,
+    changes
   };
 }
-async function preferences(prefs) {
-  await chrome.storage.local.set({ preferences: migrate(prefs) });
+async function preferences(p) {
+  await chrome.storage.local.set({ preferences: migrate(p) });
 }
 function watch(refresh2) {
-  let timer;
-  const update = () => {
-    clearTimeout(timer);
-    timer = setTimeout(refresh2, 45);
-  };
-  const events = [
-    chrome.tabs.onCreated,
-    chrome.tabs.onUpdated,
-    chrome.tabs.onRemoved,
-    chrome.tabs.onMoved,
-    chrome.tabs.onActivated,
-    chrome.tabs.onAttached,
-    chrome.tabs.onDetached,
-    chrome.tabs.onReplaced,
-    chrome.bookmarks.onCreated,
-    chrome.bookmarks.onChanged,
-    chrome.bookmarks.onMoved,
-    chrome.bookmarks.onRemoved,
-    chrome.bookmarks.onChildrenReordered,
-    chrome.storage.onChanged
-  ];
-  for (const event of events) event.addListener(update);
-  return () => {
-    clearTimeout(timer);
-    for (const event of events) event.removeListener(update);
-  };
+  subscribers.add(refresh2);
+  void start().catch(() => refresh2());
+  return () => subscribers.delete(refresh2);
 }
 async function request(action, args = {}) {
   const response = await chrome.runtime.sendMessage({ action, ...args });
   if (!response?.ok)
     throw new Error(
-      response?.error ?? "Ox could not complete this action. Please try again."
+      response?.error ?? "arcify could not complete this action. Please try again."
     );
   return response.value;
 }
@@ -150,20 +635,8 @@ function canonical(value) {
 }
 
 // src/resolver.ts
-function exactMatch(url, tabs, mru) {
-  const key = canonical(url);
-  if (!key) return;
-  return tabs.filter((t) => canonical(t.url ?? "") === key).sort(
-    (a, b) => Number(b.active) - Number(a.active) || (mru.indexOf(a.id) < 0 ? 1e9 : mru.indexOf(a.id)) - (mru.indexOf(b.id) < 0 ? 1e9 : mru.indexOf(b.id)) || a.index - b.index
-  )[0];
-}
-function resolve(bookmark, windowId, tabs, session) {
-  const current = tabs.filter((t) => t.windowId === windowId);
-  return current.find(
-    (t) => t.id === session.associations[String(windowId)]?.[bookmark.id]
-  ) ?? exactMatch(bookmark.url ?? "", current, session.mru);
-}
-function owners(bookmarks, favourites, windowId, tabs, session) {
+function owners(bookmarks, favourites, windowId2, tabs, session2) {
+  const lookup = resolutionIndex(windowId2, tabs, session2);
   const ordered = [
     ...favourites.map((id) => bookmarks.find((b) => b.id === id)).filter((b) => !!b),
     ...bookmarks.filter((b) => !favourites.includes(b.id))
@@ -171,10 +644,23 @@ function owners(bookmarks, favourites, windowId, tabs, session) {
   const result = /* @__PURE__ */ new Map();
   for (const b of ordered) {
     if (!b.url) continue;
-    const t = resolve(b, windowId, tabs, session);
+    const t = lookup(b);
     if (t?.id !== void 0 && !result.has(t.id)) result.set(t.id, b.id);
   }
   return result;
+}
+function resolutionIndex(windowId2, tabs, session2) {
+  const current = tabs.filter((t) => t.windowId === windowId2), byId = new Map(current.map((t) => [t.id, t]));
+  const recency = new Map(session2.mru.map((id, index) => [id, index]));
+  const sorted = [...current].sort(
+    (a, b) => Number(b.active) - Number(a.active) || (recency.get(a.id) ?? 1e9) - (recency.get(b.id) ?? 1e9) || a.index - b.index
+  );
+  const byURL = /* @__PURE__ */ new Map();
+  for (const tab of sorted) {
+    const key = canonical(tab.url ?? "");
+    if (key && !byURL.has(key)) byURL.set(key, tab);
+  }
+  return (b) => byId.get(session2.associations[windowId2]?.[b.id]) ?? byURL.get(canonical(b.url ?? "") ?? "");
 }
 
 // src/commands.ts
@@ -467,7 +953,37 @@ function bookmarkMenu(anchor, b, s, associated) {
         )
       }
     );
+  if (s.prefs.favourites.includes(b.id))
+    rows.push(
+      {
+        label: "Move favourite earlier",
+        disabled: s.prefs.favourites[0] === b.id,
+        run: () => request("reorder-favourite", {
+          bookmarkId: b.id,
+          direction: "earlier"
+        })
+      },
+      {
+        label: "Move favourite later",
+        disabled: s.prefs.favourites.at(-1) === b.id,
+        run: () => request("reorder-favourite", {
+          bookmarkId: b.id,
+          direction: "later"
+        })
+      }
+    );
   rows.push(
+    { label: "Customize appearance\u2026", run: () => appearanceEditor(s, b.id) },
+    {
+      label: "Move bookmark earlier",
+      disabled: !write || b.index === 0,
+      run: () => request("move", { bookmarkId: b.id, direction: "earlier" })
+    },
+    {
+      label: "Move bookmark later",
+      disabled: !write,
+      run: () => request("move", { bookmarkId: b.id, direction: "later" })
+    },
     {
       label: write ? b.url ? "Edit bookmark" : "Rename folder" : "Read-only item \u2014 editing unavailable",
       disabled: !write,
@@ -507,6 +1023,10 @@ function bookmarkMenu(anchor, b, s, associated) {
 }
 function tabMenu(anchor, t, s) {
   menu(anchor, [
+    {
+      label: "Customize appearance\u2026",
+      run: () => appearanceEditor(s, void 0, t.id)
+    },
     { label: "Close", run: () => request("close-tab", { tabId: t.id }) },
     {
       label: "Duplicate",
@@ -539,12 +1059,140 @@ function tabMenu(anchor, t, s) {
     }
   ]);
 }
+function appearanceEditor(s, bookmarkId, tabId) {
+  const original = bookmarkId ? flatten(s.tree).find((b) => b.id === bookmarkId) : s.tabs.find((t) => t.id === tabId);
+  const current = bookmarkId ? s.prefs.customizations?.[bookmarkId] : s.session.tabCustomizations?.[String(tabId)];
+  let image = current?.image;
+  const dialog = el("dialog"), form = el("form");
+  form.append(
+    el("h2", "Customize appearance"),
+    el(
+      "p",
+      bookmarkId ? "Only changes how this item looks in arcify. Native bookmark names stay unchanged." : "Local to this live tab, including navigation. Cleared when it closes or Chrome restarts.",
+      "hint"
+    )
+  );
+  const name = el("input");
+  name.value = current?.name ?? "";
+  name.maxLength = 120;
+  name.placeholder = original?.title ?? "Original name";
+  const emoji = el("input");
+  emoji.value = current?.emoji ?? "";
+  emoji.maxLength = 16;
+  emoji.placeholder = "Emoji or short icon";
+  for (const [label2, input] of [
+    ["Display name", name],
+    ["Icon replacement", emoji]
+  ]) {
+    const l = el("label", label2);
+    l.append(input);
+    form.append(l);
+  }
+  const file = el("input");
+  file.type = "file";
+  file.accept = "image/png,image/jpeg,image/webp";
+  const label = el("label", "Local image \xB7 PNG, JPEG or WebP \xB7 up to 2 MB");
+  label.append(file);
+  form.append(label);
+  const preview = el("div", "", "appearance-preview"), error = el("p", "", "error");
+  error.role = "alert";
+  const paint = () => preview.replaceChildren(
+    siteIcon(
+      name.value || original?.title || "Item",
+      original?.url,
+      emoji.value,
+      image
+    )
+  );
+  paint();
+  emoji.oninput = () => {
+    image = void 0;
+    paint();
+  };
+  name.oninput = paint;
+  let loading = false;
+  file.onchange = async () => {
+    if (!file.files?.[0]) return;
+    loading = true;
+    error.textContent = "";
+    try {
+      image = await localImage(file.files[0]);
+      emoji.value = "";
+      paint();
+    } catch (e) {
+      error.textContent = e instanceof Error ? e.message : String(e);
+    } finally {
+      loading = false;
+    }
+  };
+  const submit = el("button", "Save");
+  submit.type = "submit";
+  const commit = async (appearance) => {
+    submit.disabled = true;
+    try {
+      await request("customize", { bookmarkId, tabId, appearance });
+      dialog.close();
+    } catch (e) {
+      error.textContent = e instanceof Error ? e.message : String(e);
+      submit.disabled = false;
+    }
+  };
+  const footer = el("div", "", "dialog-actions");
+  footer.append(
+    button("Reset to original", () => commit({})),
+    button("Cancel", () => dialog.close()),
+    submit
+  );
+  form.append(preview, error, footer);
+  dialog.append(form);
+  document.body.append(dialog);
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    if (!loading)
+      void commit({
+        name: name.value,
+        emoji: emoji.value,
+        ...image ? { image } : {}
+      });
+  };
+  dialog.onclose = () => dialog.remove();
+  dialog.showModal();
+  name.focus();
+}
 
 // src/sidebar.ts
 var state;
 var port;
 var rendering = false;
 var again = false;
+var savedPage = 0;
+var tabPage = 0;
+var disclosed = [];
+function focusBookmark(id) {
+  const index = disclosed.findIndex((r) => r.node.id === id);
+  if (index >= 0) {
+    savedPage = Math.floor(index / 80);
+    render();
+    document.querySelector(`[data-key="bm-${CSS.escape(id)}"]`)?.focus();
+  }
+}
+function pager(length, page, onPage, key) {
+  const range = pageRange(length, page);
+  const nav = el("nav", "", "pager");
+  nav.ariaLabel = key + " pages";
+  const previous = button("Previous", () => onPage(range.page - 1));
+  previous.disabled = range.page === 0;
+  previous.dataset.key = key + "-previous";
+  const next = button("Next", () => onPage(range.page + 1));
+  next.disabled = range.page === range.pages - 1;
+  next.dataset.key = key + "-next";
+  nav.append(
+    previous,
+    el("span", `${range.start + 1}\u2013${range.end} of ${length}`),
+    next
+  );
+  return nav;
+}
 var root = document.querySelector("#app");
 var drag;
 function dragSource(e, kind, id) {
@@ -569,6 +1217,7 @@ function dropTarget(e, b, tab, favourite = false) {
   e.ondragleave = () => e.classList.remove("drop");
   e.ondrop = (event) => {
     event.preventDefault();
+    event.stopPropagation();
     e.classList.remove("drop");
     const source = drag;
     drag = void 0;
@@ -576,9 +1225,11 @@ function dropTarget(e, b, tab, favourite = false) {
     void safely(async () => {
       if (favourite) {
         if (source.kind === "favourite" && b) {
-          const list = state.prefs.favourites.filter((id) => id !== source.id);
-          list.splice(Math.max(0, list.indexOf(b.id)), 0, source.id);
-          await preferences({ ...state.prefs, favourites: list });
+          await request("reorder-favourite", {
+            bookmarkId: source.id,
+            targetId: b.id,
+            placement: e.dataset.drop === "after" ? "after" : "before"
+          });
         } else if (source.kind === "tab")
           await saveTab(
             state,
@@ -616,11 +1267,10 @@ function dropTarget(e, b, tab, favourite = false) {
         );
         return;
       }
-      const inside = e.dataset.drop === "inside";
       await request("move", {
         bookmarkId: source.id,
-        parentId: inside ? b.id : b.parentId,
-        index: inside ? void 0 : (b.index ?? 0) + (e.dataset.drop === "after" ? 1 : 0)
+        targetId: b.id,
+        placement: e.dataset.drop
       });
     });
   };
@@ -653,6 +1303,7 @@ function render() {
   const focused = document.activeElement?.dataset.key;
   const oldScroll = document.querySelector(".scroll")?.scrollTop ?? 0;
   const all = flatten(state.tree), chosen = all.find((n) => n.id === state.prefs.bookmarkRootId);
+  const lookup = resolutionIndex(state.windowId, state.tabs, state.session);
   const visible = chosen ? flatten(chosen.children ?? []) : [];
   const owner = owners(
     [
@@ -702,6 +1353,16 @@ function render() {
   );
   more.ariaLabel = "More actions";
   header.append(more);
+  const search = header.querySelector("button");
+  search.replaceChildren(
+    icon("search"),
+    el("span", "Search or jump"),
+    el("kbd", short(state, "_execute_action"))
+  );
+  header.children[1].replaceChildren(icon("panel"));
+  more.replaceChildren(icon("more"));
+  header.querySelectorAll("button").forEach((b, i) => b.dataset.key = "header-" + i);
+  header.children[1].setAttribute("aria-label", "Close arcify sidebar");
   root.append(header);
   const scroll = el("main", "", "scroll");
   const fav = el("div", "", "favourites");
@@ -710,14 +1371,34 @@ function render() {
   for (const id of state.prefs.favourites) {
     const b = all.find((n) => n.id === id);
     if (!b) continue;
-    const t = resolve(b, state.windowId, state.tabs, state.session);
+    const t = lookup(b);
     const tile = button(
       state.prefs.icons[id] || monogram(b.title),
       () => request("activate", { bookmarkId: id, windowId: state.windowId }),
       "tile" + (t?.active ? " active" : "")
     );
+    tile.replaceChildren(
+      siteIcon(
+        state.prefs.customizations?.[id]?.name ?? b.title,
+        b.url,
+        state.prefs.customizations?.[id]?.emoji ?? state.prefs.icons[id],
+        state.prefs.customizations?.[id]?.image
+      )
+    );
+    if (t) tile.classList.add("is-open");
     tile.title = tile.ariaLabel = b.title + " \u2014 " + b.url + (t?.url && t.url !== b.url ? " \xB7 Current: " + t.url : "");
     tile.dataset.key = "fav-" + id;
+    tile.onkeydown = (e) => {
+      if (e.key === "ContextMenu" || e.shiftKey && e.key === "F10") {
+        e.preventDefault();
+        bookmarkMenu(
+          tile,
+          b,
+          state,
+          state.session.associations[state.windowId]?.[id]
+        );
+      }
+    };
     tile.oncontextmenu = (e) => {
       e.preventDefault();
       bookmarkMenu(
@@ -741,10 +1422,51 @@ function render() {
     "section-title"
   );
   saved.setAttribute("aria-expanded", String(!state.prefs.savedCollapsed));
+  saved.dataset.key = "saved-collapse";
+  saved.replaceChildren(
+    icon(state.prefs.savedCollapsed ? "chevron" : "down"),
+    el("span", "Saved")
+  );
   scroll.append(saved);
+  if (state.needsSetup || !chosen) {
+    const setup = el("section", "", "setup");
+    setup.append(
+      el(
+        "p",
+        chosen ? "Choose your saved-links folder" : "That saved folder is no longer available. Choose another folder."
+      )
+    );
+    const picker = el("select");
+    picker.ariaLabel = "Bookmark root folder";
+    for (const folder of all.filter((n) => !n.url && n.parentId)) {
+      const option = el(
+        "option",
+        [folder.path, folder.title].filter(Boolean).join(" / ") + (folder.unmodifiable ? " (read-only)" : "")
+      );
+      option.value = folder.id;
+      picker.append(option);
+    }
+    picker.value = state.prefs.bookmarkRootId ?? "";
+    if (!picker.value && picker.options.length) picker.selectedIndex = 0;
+    setup.append(
+      picker,
+      button(
+        "Use folder",
+        () => preferences({ ...state.prefs, bookmarkRootId: picker.value })
+      ),
+      button(
+        "Use default",
+        () => preferences({
+          ...state.prefs,
+          bookmarkRootId: all.find((n) => n.folderType === "bookmarks-bar")?.id ?? picker.value
+        })
+      )
+    );
+    scroll.append(setup);
+  }
   const row = (b, depth, context = false) => {
     if (b.url && state.prefs.favourites.includes(b.id)) return;
-    const t = b.url ? resolve(b, state.windowId, state.tabs, state.session) : void 0;
+    const t = b.url ? lookup(b) : void 0;
     const wrapper = el(
       "div",
       "",
@@ -760,25 +1482,51 @@ function render() {
       }),
       "row-main"
     );
+    target.replaceChildren(
+      ...b.url ? [
+        siteIcon(
+          b.title,
+          b.url,
+          state.prefs.customizations?.[b.id]?.emoji,
+          state.prefs.customizations?.[b.id]?.image
+        )
+      ] : [
+        icon(expanded ? "down" : "chevron"),
+        state.prefs.customizations?.[b.id]?.emoji || state.prefs.customizations?.[b.id]?.image ? siteIcon(
+          b.title,
+          void 0,
+          state.prefs.customizations?.[b.id]?.emoji,
+          state.prefs.customizations?.[b.id]?.image
+        ) : icon("folder")
+      ],
+      el(
+        "span",
+        state.prefs.customizations?.[b.id]?.name || b.title || "Untitled",
+        "row-label"
+      )
+    );
     target.dataset.key = "bm-" + b.id;
     target.title = b.title + (b.url ? " \u2014 " + b.url : "") + (t?.url && t.url !== b.url ? " \xB7 Current: " + t.url : "");
     if (!b.url) target.setAttribute("aria-expanded", String(expanded));
     target.onkeydown = (e) => {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const index = disclosed.findIndex((r) => r.node.id === b.id);
+        const next = disclosed[index + (e.key === "ArrowDown" ? 1 : -1)];
+        if (next) focusBookmark(next.node.id);
+      }
       if (e.key === "ArrowRight" && !b.url) {
         e.preventDefault();
         if (!expanded) target.click();
-        else
-          document.querySelector(
-            `[data-key="bm-${CSS.escape(b.children?.[0]?.id ?? "")}"]`
-          )?.focus();
+        else {
+          const child = disclosed[disclosed.findIndex((r) => r.node.id === b.id) + 1];
+          if (child) focusBookmark(child.node.id);
+        }
       }
       if (e.key === "ArrowLeft") {
         e.preventDefault();
         if (expanded && !b.url) target.click();
-        else
-          document.querySelector(
-            `[data-key="bm-${CSS.escape(b.parentId ?? "")}"]`
-          )?.focus();
+        else if (b.parentId) focusBookmark(b.parentId);
       }
     };
     target.oncontextmenu = (e) => {
@@ -798,6 +1546,7 @@ function render() {
         () => request("close-tab", { tabId: t.id }),
         "row-control"
       );
+      close.replaceChildren(icon("close"));
       close.ariaLabel = "Close live tab for " + b.title;
       wrapper.append(close);
     }
@@ -811,35 +1560,44 @@ function render() {
       ),
       "row-control"
     );
+    overflow.replaceChildren(icon("more"));
     overflow.ariaLabel = "Actions for " + b.title;
+    overflow.dataset.key = "actions-" + b.id;
     wrapper.append(overflow);
     dragSource(wrapper, "bookmark", b.id);
     dropTarget(wrapper, b);
     scroll.append(wrapper);
-    if (!b.url && !context) {
-      if (expanded) for (const child of b.children ?? []) row(child, depth + 1);
-      else {
-        const active = flatten(b.children ?? []).find(
-          (c) => c.url && resolve(c, state.windowId, state.tabs, state.session)?.active
-        );
-        if (active) row(active, depth + 1, true);
-      }
-    }
   };
   if (!chosen) {
-    const setup = el("div", "", "setup");
-    setup.append(
-      el(
-        "p",
-        "Choose a bookmark folder to show saved links. Your bookmarks stay where they are."
-      ),
-      button("Choose folder", () => chrome.runtime.openOptionsPage())
-    );
-    scroll.append(setup);
   } else if (!state.prefs.savedCollapsed) {
     if (!chosen.children?.length)
       scroll.append(el("p", "No saved links in this folder.", "empty"));
-    for (const b of chosen.children ?? []) row(b, 0);
+    const activeIds = /* @__PURE__ */ new Set();
+    for (const [tabId, id] of owner)
+      if (state.tabs.find((t) => t.id === tabId)?.active) activeIds.add(id);
+    disclosed = treeRows(
+      chosen.children ?? [],
+      new Set(state.prefs.expanded),
+      new Set(state.prefs.favourites),
+      activeIds
+    );
+    const range = pageRange(disclosed.length, savedPage);
+    savedPage = range.page;
+    for (const item of disclosed.slice(range.start, range.end))
+      row(item.node, item.depth, item.contextual);
+    if (range.pages > 1)
+      scroll.append(
+        pager(
+          disclosed.length,
+          savedPage,
+          (next) => {
+            savedPage = next;
+            render();
+            document.querySelector(".scroll .row-main")?.focus();
+          },
+          "Saved"
+        )
+      );
   }
   scroll.append(el("hr"));
   const newTab = button(
@@ -847,20 +1605,40 @@ function render() {
     () => chrome.action.openPopup(),
     "row-main new-tab"
   );
-  newTab.append(el("kbd", short(state, "_execute_action")));
+  newTab.replaceChildren(
+    icon("plus"),
+    el("span", "New tab"),
+    el("kbd", short(state, "_execute_action"))
+  );
   scroll.append(newTab);
   const open = el("h2", "Open tabs", "section-title");
   open.id = "open-tabs";
   open.tabIndex = -1;
   scroll.append(open);
   const tabs = state.tabs.filter((t) => t.windowId === state.windowId && !owner.has(t.id)).sort((a, b) => a.index - b.index);
-  for (const t of tabs) {
+  const tabRange = pageRange(tabs.length, tabPage);
+  tabPage = tabRange.page;
+  for (const t of tabs.slice(tabRange.start, tabRange.end)) {
     const r = el("div", "", "row" + (t.active ? " active" : ""));
     const main = button(
       (t.pinned ? "\u2316 " : monogram(t.title ?? "") + "  ") + (t.title || t.url || "New tab"),
       () => request("switch", { tabId: t.id }),
       "row-main"
     );
+    main.replaceChildren(
+      siteIcon(
+        t.title ?? "Tab",
+        t.url,
+        state.session.tabCustomizations?.[String(t.id)]?.emoji,
+        state.session.tabCustomizations?.[String(t.id)]?.image
+      ),
+      el(
+        "span",
+        state.session.tabCustomizations?.[String(t.id)]?.name || t.title || "New tab",
+        "row-label"
+      )
+    );
+    if (t.pinned) main.append(icon("pin"));
     main.title = t.url ?? "";
     main.dataset.key = "tab-" + t.id;
     main.oncontextmenu = (e) => {
@@ -872,26 +1650,59 @@ function render() {
       async () => {
         const i = tabs.indexOf(t);
         await request("close-tab", { tabId: t.id });
-        await refresh();
         const next = tabs[i + 1] ?? tabs[i - 1];
+        if (next)
+          tabPage = Math.floor(
+            Math.max(
+              0,
+              tabs.filter((candidate) => candidate.id !== t.id).findIndex((t2) => t2.id === next.id)
+            ) / 80
+          );
+        await refresh();
         document.querySelector(`[data-key="tab-${next?.id}"]`)?.focus();
       },
       "row-control"
     );
+    close.replaceChildren(icon("close"));
     close.ariaLabel = "Close " + t.title;
     const more2 = button("\u22EF", () => tabMenu(main, t, state), "row-control");
+    more2.replaceChildren(icon("more"));
     more2.ariaLabel = "Actions for " + t.title;
     r.append(main, more2, close);
     dragSource(r, "tab", String(t.id));
     dropTarget(r, void 0, t);
     scroll.append(r);
   }
+  if (tabRange.pages > 1)
+    scroll.append(
+      pager(
+        tabs.length,
+        tabPage,
+        (next) => {
+          tabPage = next;
+          render();
+          document.querySelector("#open-tabs")?.focus();
+        },
+        "Open tabs"
+      )
+    );
   root.append(scroll);
   const footer = el("footer");
   footer.append(
     button("\u2699  Settings", () => runCommand("settings", state)),
     button("\u26F6", () => runCommand("fullscreen", state), "icon")
   );
+  footer.querySelectorAll("button").forEach((b, i) => b.dataset.key = "footer-" + i);
+  footer.children[1].setAttribute("aria-label", "Toggle browser fullscreen");
+  const settings = footer.querySelector("button");
+  settings.replaceChildren(icon("settings"), el("span", "Settings"));
+  footer.children[1].replaceChildren(icon("fullscreen"));
+  const brand = el("span", "", "brand");
+  const logo = el("img");
+  logo.src = "brand/arc-logo.svg";
+  logo.alt = "";
+  brand.append(logo, el("span", "arcify"));
+  footer.insertBefore(brand, footer.children[1]);
   root.append(footer);
   scroll.scrollTop = oldScroll;
   if (focused)

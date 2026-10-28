@@ -1,3 +1,5 @@
+import { localImage, type Appearance } from "./appearance";
+import { siteIcon } from "./icons";
 import { preferences, request, type Snapshot } from "./browser";
 import { flatten, movable, descendants, type Bookmark } from "./model";
 import { executeCommand, type CommandId } from "./commands";
@@ -265,7 +267,39 @@ export function bookmarkMenu(
           ),
       },
     );
+  if (s.prefs.favourites.includes(b.id))
+    rows.push(
+      {
+        label: "Move favourite earlier",
+        disabled: s.prefs.favourites[0] === b.id,
+        run: () =>
+          request("reorder-favourite", {
+            bookmarkId: b.id,
+            direction: "earlier",
+          }),
+      },
+      {
+        label: "Move favourite later",
+        disabled: s.prefs.favourites.at(-1) === b.id,
+        run: () =>
+          request("reorder-favourite", {
+            bookmarkId: b.id,
+            direction: "later",
+          }),
+      },
+    );
   rows.push(
+    { label: "Customize appearance…", run: () => appearanceEditor(s, b.id) },
+    {
+      label: "Move bookmark earlier",
+      disabled: !write || b.index === 0,
+      run: () => request("move", { bookmarkId: b.id, direction: "earlier" }),
+    },
+    {
+      label: "Move bookmark later",
+      disabled: !write,
+      run: () => request("move", { bookmarkId: b.id, direction: "later" }),
+    },
     {
       label: write
         ? b.url
@@ -319,6 +353,10 @@ export function tabMenu(
   s: Snapshot,
 ): void {
   menu(anchor, [
+    {
+      label: "Customize appearance…",
+      run: () => appearanceEditor(s, undefined, t.id),
+    },
     { label: "Close", run: () => request("close-tab", { tabId: t.id }) },
     {
       label: "Duplicate",
@@ -351,4 +389,118 @@ export function tabMenu(
       },
     },
   ]);
+}
+
+export function appearanceEditor(
+  s: Snapshot,
+  bookmarkId?: string,
+  tabId?: number,
+): void {
+  const original = bookmarkId
+    ? flatten(s.tree).find((b) => b.id === bookmarkId)
+    : s.tabs.find((t) => t.id === tabId);
+  const current = bookmarkId
+    ? s.prefs.customizations?.[bookmarkId]
+    : s.session.tabCustomizations?.[String(tabId)];
+  let image = current?.image;
+  const dialog = el("dialog"),
+    form = el("form");
+  form.append(
+    el("h2", "Customize appearance"),
+    el(
+      "p",
+      bookmarkId
+        ? "Only changes how this item looks in arcify. Native bookmark names stay unchanged."
+        : "Local to this live tab, including navigation. Cleared when it closes or Chrome restarts.",
+      "hint",
+    ),
+  );
+  const name = el("input");
+  name.value = current?.name ?? "";
+  name.maxLength = 120;
+  name.placeholder = original?.title ?? "Original name";
+  const emoji = el("input");
+  emoji.value = current?.emoji ?? "";
+  emoji.maxLength = 16;
+  emoji.placeholder = "Emoji or short icon";
+  for (const [label, input] of [
+    ["Display name", name],
+    ["Icon replacement", emoji],
+  ] as const) {
+    const l = el("label", label);
+    l.append(input);
+    form.append(l);
+  }
+  const file = el("input");
+  file.type = "file";
+  file.accept = "image/png,image/jpeg,image/webp";
+  const label = el("label", "Local image · PNG, JPEG or WebP · up to 2 MB");
+  label.append(file);
+  form.append(label);
+  const preview = el("div", "", "appearance-preview"),
+    error = el("p", "", "error");
+  error.role = "alert";
+  const paint = () =>
+    preview.replaceChildren(
+      siteIcon(
+        name.value || original?.title || "Item",
+        original?.url,
+        emoji.value,
+        image,
+      ),
+    );
+  paint();
+  emoji.oninput = () => {
+    image = undefined;
+    paint();
+  };
+  name.oninput = paint;
+  let loading = false;
+  file.onchange = async () => {
+    if (!file.files?.[0]) return;
+    loading = true;
+    error.textContent = "";
+    try {
+      image = await localImage(file.files[0]);
+      emoji.value = "";
+      paint();
+    } catch (e) {
+      error.textContent = e instanceof Error ? e.message : String(e);
+    } finally {
+      loading = false;
+    }
+  };
+  const submit = el("button", "Save");
+  submit.type = "submit";
+  const commit = async (appearance: Appearance) => {
+    submit.disabled = true;
+    try {
+      await request("customize", { bookmarkId, tabId, appearance });
+      dialog.close();
+    } catch (e) {
+      error.textContent = e instanceof Error ? e.message : String(e);
+      submit.disabled = false;
+    }
+  };
+  const footer = el("div", "", "dialog-actions");
+  footer.append(
+    button("Reset to original", () => commit({})),
+    button("Cancel", () => dialog.close()),
+    submit,
+  );
+  form.append(preview, error, footer);
+  dialog.append(form);
+  document.body.append(dialog);
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    if (!loading)
+      void commit({
+        name: name.value,
+        emoji: emoji.value,
+        ...(image ? { image } : {}),
+      });
+  };
+  dialog.onclose = () => dialog.remove();
+  dialog.showModal();
+  name.focus();
 }

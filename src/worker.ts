@@ -1,4 +1,10 @@
 import {
+  validateAppearance,
+  checkAppearanceQuota,
+  type Appearance,
+} from "./appearance";
+import { bookmarkPlacement, reorderIDs, type Placement } from "./order";
+import {
   emptySession,
   readSession,
   flatten,
@@ -107,6 +113,16 @@ const reconcile = () => {
         p.favourites = p.favourites.filter((id) =>
           all.some((b) => b.id === id),
         );
+        p.customizations = Object.fromEntries(
+          Object.entries(p.customizations ?? {}).filter(([id]) =>
+            all.some((b) => b.id === id),
+          ),
+        );
+        p.icons = Object.fromEntries(
+          Object.entries(p.icons).filter(([id]) =>
+            all.some((b) => b.id === id),
+          ),
+        );
         p.expanded = p.expanded.filter((id) => all.some((b) => b.id === id));
         await chrome.storage.local.set({ preferences: p });
       }
@@ -120,6 +136,10 @@ chrome.tabs.onDetached.addListener(reconcile);
 chrome.tabs.onReplaced.addListener((added, removed) => {
   void ready.then(() =>
     serial(async () => {
+      if (session.tabCustomizations?.[removed]) {
+        session.tabCustomizations[added] = session.tabCustomizations[removed];
+        delete session.tabCustomizations[removed];
+      }
       for (const a of Object.values(session.associations))
         for (const id of Object.keys(a)) if (a[id] === removed) a[id] = added;
       await save();
@@ -134,7 +154,11 @@ chrome.runtime.onStartup.addListener(() => {
   });
 });
 interface Message {
+  appearance?: Appearance;
   action: string;
+  targetId?: string;
+  placement?: Placement;
+  direction?: "earlier" | "later";
   windowId?: number;
   tabId?: number;
   bookmarkId?: string;
@@ -162,6 +186,33 @@ async function run(m: Message): Promise<unknown> {
     return chrome.tabs.get(m.tabId);
   };
   switch (m.action) {
+    case "customize": {
+      const appearance = validateAppearance(m.appearance);
+      if (m.bookmarkId) {
+        await bookmark(m.bookmarkId);
+        const prefs = migrate(
+          (await chrome.storage.local.get("preferences")).preferences,
+        );
+        const items = { ...prefs.customizations };
+        if (Object.keys(appearance).length) items[m.bookmarkId] = appearance;
+        else delete items[m.bookmarkId];
+        checkAppearanceQuota(items);
+        delete prefs.icons[m.bookmarkId];
+        await chrome.storage.local.set({
+          preferences: { ...prefs, customizations: items },
+        });
+      } else {
+        const t = await tab();
+        const items = { ...session.tabCustomizations };
+        if (Object.keys(appearance).length) items[String(t.id)] = appearance;
+        else delete items[String(t.id)];
+        checkAppearanceQuota(items);
+        const next = { ...session, tabCustomizations: items };
+        await chrome.storage.session.set({ session: next });
+        session = next;
+      }
+      return;
+    }
     case "activate": {
       if (w === undefined) throw new Error("No originating window.");
       const resolver = new SavedResolver(
@@ -208,7 +259,7 @@ async function run(m: Message): Promise<unknown> {
     case "duplicate": {
       const t = await tab();
       if (w === undefined) throw new Error("No originating window.");
-      return openURL(t.url ?? "", w);
+      return openURL(t.url ?? "", w, true);
     }
     case "move-tab": {
       const t = await tab();
@@ -270,13 +321,55 @@ async function run(m: Message): Promise<unknown> {
     }
     case "move": {
       const b = await bookmark(m.bookmarkId),
-        p = await bookmark(m.parentId),
         all = flatten(await chrome.bookmarks.getTree());
-      if (!canMove(b, p, all))
-        throw new Error(
-          "This move would create a cycle or use a read-only folder.",
+      let destination: { parentId: string; index?: number };
+      if (m.targetId) {
+        destination = bookmarkPlacement(
+          b,
+          await bookmark(m.targetId),
+          m.placement ?? "inside",
+          all,
         );
-      return chrome.bookmarks.move(b.id, { parentId: p.id, index: m.index });
+      } else if (m.direction) {
+        const siblings = all
+          .filter((n) => n.parentId === b.parentId)
+          .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+        const index = siblings.findIndex((n) => n.id === b.id);
+        const target = siblings[index + (m.direction === "earlier" ? -1 : 1)];
+        if (!target) return b;
+        destination = bookmarkPlacement(
+          b,
+          target,
+          m.direction === "earlier" ? "before" : "after",
+          all,
+        );
+      } else {
+        const p = await bookmark(m.parentId);
+        if (!canMove(b, p, all))
+          throw new Error(
+            "This move would create a cycle or use a read-only folder.",
+          );
+        destination = { parentId: p.id, index: m.index };
+      }
+      return chrome.bookmarks.move(b.id, destination);
+    }
+    case "reorder-favourite": {
+      const p = migrate(
+        (await chrome.storage.local.get("preferences")).preferences,
+      );
+      const id = m.bookmarkId ?? "";
+      const position = p.favourites.indexOf(id);
+      const target =
+        m.targetId ??
+        p.favourites[position + (m.direction === "earlier" ? -1 : 1)];
+      if (!target) return;
+      p.favourites = reorderIDs(
+        p.favourites,
+        id,
+        target,
+        m.placement === "after" || m.direction === "later" ? "after" : "before",
+      );
+      return chrome.storage.local.set({ preferences: p });
     }
     case "favourite": {
       const b = await bookmark(m.bookmarkId);

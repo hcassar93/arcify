@@ -38,6 +38,7 @@ export function owners(
   tabs: Tab[],
   session: Session,
 ): Map<number, string> {
+  const lookup = resolutionIndex(windowId, tabs, session);
   const ordered = [
     ...favourites
       .map((id) => bookmarks.find((b) => b.id === id))
@@ -47,7 +48,7 @@ export function owners(
   const result = new Map<number, string>();
   for (const b of ordered) {
     if (!b.url) continue;
-    const t = resolve(b, windowId, tabs, session);
+    const t = lookup(b);
     if (t?.id !== undefined && !result.has(t.id)) result.set(t.id, b.id);
   }
   return result;
@@ -95,4 +96,28 @@ export class SavedResolver {
     }
     return tab;
   }
+}
+/** One canonical tab index per snapshot, rather than reparsing every tab for every bookmark. */
+export function resolutionIndex(
+  windowId: number,
+  tabs: Tab[],
+  session: Session,
+): (b: Bookmark) => Tab | undefined {
+  const current = tabs.filter((t) => t.windowId === windowId),
+    byId = new Map(current.map((t) => [t.id, t]));
+  const recency = new Map(session.mru.map((id, index) => [id, index]));
+  const sorted = [...current].sort(
+    (a, b) =>
+      Number(b.active) - Number(a.active) ||
+      (recency.get(a.id!) ?? 1e9) - (recency.get(b.id!) ?? 1e9) ||
+      a.index - b.index,
+  );
+  const byURL = new Map<string, Tab>();
+  for (const tab of sorted) {
+    const key = canonical(tab.url ?? "");
+    if (key && !byURL.has(key)) byURL.set(key, tab);
+  }
+  return (b) =>
+    byId.get(session.associations[windowId]?.[b.id]) ??
+    byURL.get(canonical(b.url ?? "") ?? "");
 }

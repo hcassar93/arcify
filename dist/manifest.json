@@ -1,18 +1,18 @@
 {
   "manifest_version": 3,
-  "name": "Ox",
+  "name": "arcify",
   "version": "0.1.0",
   "minimum_chrome_version": "142",
-  "permissions": ["tabs", "bookmarks", "storage", "sidePanel"],
+  "permissions": ["tabs", "bookmarks", "storage", "sidePanel", "favicon"],
   "incognito": "not_allowed",
   "action": {
     "default_popup": "palette.html",
-    "default_title": "Ox \u2014 Search or jump",
+    "default_title": "arcify \u2014 Search or jump",
     "default_icon": {
-      "16": "icons/ox-16.png",
-      "32": "icons/ox-32.png",
-      "48": "icons/ox-48.png",
-      "128": "icons/ox-128.png"
+      "16": "icons/arcify-16.png",
+      "32": "icons/arcify-32.png",
+      "48": "icons/arcify-48.png",
+      "128": "icons/arcify-128.png"
     }
   },
   "side_panel": {
@@ -34,7 +34,7 @@
         "default": "Ctrl+Shift+Y",
         "mac": "Command+Shift+Y"
       },
-      "description": "Toggle Ox sidebar"
+      "description": "Toggle arcify sidebar"
     }
   },
   "content_security_policy": {
@@ -45,9 +45,9 @@
     "open_in_tab": true
   },
   "icons": {
-    "16": "icons/ox-16.png",
-    "32": "icons/ox-32.png",
-    "48": "icons/ox-48.png",
-    "128": "icons/ox-128.png"
+    "16": "icons/arcify-16.png",
+    "32": "icons/arcify-32.png",
+    "48": "icons/arcify-48.png",
+    "128": "icons/arcify-128.png"
   }
 }

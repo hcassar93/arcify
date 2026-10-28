@@ -1,3 +1,37 @@
+// src/appearance.ts
+function validateAppearance(raw) {
+  if (!raw || typeof raw !== "object") return {};
+  const v = raw, out = {};
+  if (v.name !== void 0) {
+    if (typeof v.name !== "string" || v.name.length > 120)
+      throw new Error("Display names must be at most 120 characters.");
+    if (v.name.trim()) out.name = v.name.trim();
+  }
+  if (v.emoji !== void 0) {
+    if (typeof v.emoji !== "string" || v.emoji.length > 16)
+      throw new Error("Choose a short icon or emoji.");
+    if (v.emoji.trim()) out.emoji = v.emoji.trim();
+  }
+  if (v.image !== void 0) {
+    if (typeof v.image !== "string" || v.image.length > 1e5 || !/^data:image\/png;base64,iVBORw0KGgo[A-Za-z0-9+/=]+$/.test(v.image))
+      throw new Error("Choose a validated PNG image.");
+    out.image = v.image;
+  }
+  return out;
+}
+function readAppearances(raw) {
+  const result = {};
+  if (!raw || typeof raw !== "object") return result;
+  for (const [id, value] of Object.entries(raw)) {
+    if (["__proto__", "constructor", "prototype"].includes(id)) continue;
+    try {
+      result[id] = validateAppearance(value);
+    } catch {
+    }
+  }
+  return JSON.stringify(result).length <= 2e6 ? result : {};
+}
+
 // src/model.ts
 var defaults = {
   schemaVersion: 1,
@@ -19,6 +53,7 @@ function migrate(raw) {
   const p = raw && typeof raw === "object" ? raw : {};
   return {
     ...defaults,
+    customizations: readAppearances(p.customizations),
     bookmarkRootId: typeof p.bookmarkRootId === "string" ? p.bookmarkRootId : null,
     favourites: ids(p.favourites).slice(0, 12),
     expanded: ids(p.expanded),
@@ -52,6 +87,7 @@ function readSession(raw) {
       )
     );
   }
+  result.tabCustomizations = readAppearances(s.tabCustomizations);
   result.mru = Array.isArray(s.mru) ? [
     ...new Set(
       s.mru.filter((id) => Number.isInteger(id) && id >= 0)
@@ -65,37 +101,328 @@ function readSession(raw) {
   return result;
 }
 
+// src/stores.ts
+var BookmarkStore = class {
+  nodes = /* @__PURE__ */ new Map();
+  changed = /* @__PURE__ */ new Set();
+  removed = /* @__PURE__ */ new Set();
+  roots = [];
+  constructor(tree = []) {
+    this.reset(tree);
+  }
+  reset(tree) {
+    for (const id of this.nodes.keys()) this.removed.add(id);
+    this.nodes.clear();
+    this.roots = structuredClone(tree);
+    for (const n of this.roots) this.index(n, "");
+  }
+  index(node, path) {
+    const saved = Object.assign(node, { path });
+    this.nodes.set(node.id, saved);
+    this.changed.add(node.id);
+    this.removed.delete(node.id);
+    for (const child of node.children ?? [])
+      this.index(child, [path, node.title].filter(Boolean).join(" / "));
+  }
+  siblings(parentId) {
+    if (!parentId) return this.roots;
+    const parent = this.nodes.get(parentId);
+    if (!parent) throw new Error("Missing bookmark parent");
+    return parent.children ?? (parent.children = []);
+  }
+  reindex(children) {
+    children.forEach((n, index) => {
+      if (n.index !== index) {
+        n.index = index;
+        this.changed.add(n.id);
+      }
+    });
+  }
+  create(node) {
+    if (this.nodes.has(node.id)) this.remove(node.id);
+    const siblings = this.siblings(node.parentId);
+    siblings.splice(
+      Math.min(node.index ?? siblings.length, siblings.length),
+      0,
+      structuredClone(node)
+    );
+    const added = siblings.find((n) => n.id === node.id);
+    const parent = this.nodes.get(node.parentId ?? "");
+    this.index(
+      added,
+      parent ? [parent.path, parent.title].filter(Boolean).join(" / ") : ""
+    );
+    this.reindex(siblings);
+  }
+  update(id, change) {
+    const node = this.nodes.get(id);
+    if (!node) throw new Error("Missing bookmark");
+    Object.assign(node, change);
+    this.index(node, node.path);
+  }
+  remove(id) {
+    const node = this.nodes.get(id);
+    if (!node) return;
+    const siblings = this.siblings(node.parentId);
+    const i = siblings.findIndex((n) => n.id === id);
+    if (i >= 0) siblings.splice(i, 1);
+    const remove = (n) => {
+      for (const child of n.children ?? []) remove(child);
+      this.nodes.delete(n.id);
+      this.changed.delete(n.id);
+      this.removed.add(n.id);
+    };
+    remove(node);
+    this.reindex(siblings);
+  }
+  move(id, parentId, index) {
+    const node = this.nodes.get(id);
+    if (!node) throw new Error("Missing moved bookmark");
+    const old = this.siblings(node.parentId);
+    old.splice(
+      old.findIndex((n) => n.id === id),
+      1
+    );
+    this.reindex(old);
+    node.parentId = parentId;
+    const target = this.siblings(parentId);
+    target.splice(Math.min(index, target.length), 0, node);
+    this.reindex(target);
+    const parent = this.nodes.get(parentId);
+    this.index(node, [parent.path, parent.title].filter(Boolean).join(" / "));
+  }
+  reorder(parentId, ids2) {
+    const siblings = this.siblings(parentId);
+    const rank = new Map(ids2.map((id, i) => [id, i]));
+    siblings.sort((a, b) => (rank.get(a.id) ?? 1e9) - (rank.get(b.id) ?? 1e9));
+    this.reindex(siblings);
+  }
+  drain() {
+    const value = { changed: [...this.changed], removed: [...this.removed] };
+    this.changed.clear();
+    this.removed.clear();
+    return value;
+  }
+};
+var TabStore = class {
+  nodes = /* @__PURE__ */ new Map();
+  changed = /* @__PURE__ */ new Set();
+  removed = /* @__PURE__ */ new Set();
+  constructor(tabs = []) {
+    for (const tab of tabs) this.upsert(tab);
+  }
+  upsert(tab) {
+    if (tab.id === void 0) return;
+    this.nodes.set(tab.id, { ...tab });
+    this.changed.add(tab.id);
+    this.removed.delete(tab.id);
+  }
+  insert(tab) {
+    if (tab.id === void 0) return;
+    const siblings = [...this.nodes.values()].filter((t) => t.windowId === tab.windowId && t.id !== tab.id).sort((a, b) => a.index - b.index);
+    siblings.splice(Math.min(tab.index, siblings.length), 0, tab);
+    siblings.forEach((t, index) => {
+      if (t.id === tab.id || t.index !== index) this.upsert({ ...t, index });
+    });
+  }
+  remove(id) {
+    const removed = this.nodes.get(id);
+    this.nodes.delete(id);
+    this.changed.delete(id);
+    this.removed.add(id);
+    if (removed)
+      [...this.nodes.values()].filter((t) => t.windowId === removed.windowId).sort((a, b) => a.index - b.index).forEach((t, index) => {
+        if (t.index !== index) this.upsert({ ...t, index });
+      });
+  }
+  activate(id, windowId2) {
+    for (const tab of this.nodes.values())
+      if (tab.windowId === windowId2 && tab.active !== (tab.id === id))
+        this.upsert({ ...tab, active: tab.id === id });
+  }
+  move(id, windowId2, index) {
+    const tab = this.nodes.get(id);
+    if (!tab) return;
+    const siblings = [...this.nodes.values()].filter((t) => t.windowId === windowId2 && t.id !== id).sort((a, b) => a.index - b.index);
+    siblings.splice(index, 0, { ...tab, windowId: windowId2 });
+    siblings.forEach((t, index2) => {
+      if (t.index !== index2 || t.id === id) this.upsert({ ...t, index: index2 });
+    });
+  }
+  drain() {
+    const value = { changed: [...this.changed], removed: [...this.removed] };
+    this.changed.clear();
+    this.removed.clear();
+    return value;
+  }
+};
+
 // src/browser.ts
-async function snapshot() {
-  const [local, session, tree, tabs, win, shortcuts] = await Promise.all([
+var init;
+var bookmarkStore = new BookmarkStore();
+var tabStore = new TabStore();
+var prefs = migrate(null);
+var session = readSession(null);
+var windowId;
+var shortcuts = [];
+var initial = true;
+var sessionChanged = true;
+var preferencesChanged = true;
+var hydrated = false;
+var pending = [];
+var subscribers = /* @__PURE__ */ new Set();
+var timer;
+var notify = () => {
+  if (timer) return;
+  timer = setTimeout(() => {
+    timer = void 0;
+    for (const fn of subscribers) fn();
+  }, 40);
+};
+var recovering = false;
+async function recover() {
+  if (recovering) return;
+  recovering = true;
+  try {
+    bookmarkStore.reset(await chrome.bookmarks.getTree());
+    notify();
+  } finally {
+    recovering = false;
+  }
+}
+var apply = (fn) => {
+  if (!hydrated) {
+    pending.push(fn);
+    return;
+  }
+  try {
+    fn();
+    notify();
+  } catch {
+    void recover();
+  }
+};
+async function refreshTab(id) {
+  try {
+    const tab = await chrome.tabs.get(id);
+    const win = await chrome.windows.get(tab.windowId);
+    apply(
+      () => win.type === "normal" ? tabStore.nodes.has(id) ? tabStore.upsert(tab) : tabStore.insert(tab) : tabStore.remove(id)
+    );
+  } catch {
+    apply(() => tabStore.remove(id));
+  }
+}
+function start() {
+  if (init) return init;
+  chrome.bookmarks.onCreated.addListener(
+    (_id, node) => apply(() => bookmarkStore.create(node))
+  );
+  chrome.bookmarks.onChanged.addListener(
+    (id, change) => apply(() => bookmarkStore.update(id, change))
+  );
+  chrome.bookmarks.onMoved.addListener(
+    (id, info) => apply(() => bookmarkStore.move(id, info.parentId, info.index))
+  );
+  chrome.bookmarks.onRemoved.addListener(
+    (id) => apply(() => bookmarkStore.remove(id))
+  );
+  chrome.bookmarks.onChildrenReordered.addListener(
+    (id, info) => apply(() => bookmarkStore.reorder(id, info.childIds))
+  );
+  chrome.tabs.onCreated.addListener((tab) => {
+    if (tab.id !== void 0) void refreshTab(tab.id);
+  });
+  chrome.tabs.onUpdated.addListener((id, _change, tab) => {
+    if (tabStore.nodes.has(id)) apply(() => tabStore.upsert(tab));
+    else void refreshTab(id);
+  });
+  chrome.tabs.onRemoved.addListener((id) => apply(() => tabStore.remove(id)));
+  chrome.tabs.onMoved.addListener(
+    (id, info) => apply(() => tabStore.move(id, info.windowId, info.toIndex))
+  );
+  chrome.tabs.onActivated.addListener(
+    (info) => apply(() => tabStore.activate(info.tabId, info.windowId))
+  );
+  chrome.tabs.onDetached.addListener((id) => apply(() => tabStore.remove(id)));
+  chrome.tabs.onAttached.addListener((id) => void refreshTab(id));
+  chrome.tabs.onReplaced.addListener((added, removed) => {
+    apply(() => tabStore.remove(removed));
+    void refreshTab(added);
+  });
+  chrome.storage.onChanged.addListener(
+    (changes, area) => apply(() => {
+      if (area === "local" && changes.preferences) {
+        prefs = migrate(changes.preferences.newValue);
+        preferencesChanged = true;
+      }
+      if (area === "session" && changes.session) {
+        session = readSession(changes.session.newValue);
+        sessionChanged = true;
+      }
+    })
+  );
+  init = Promise.all([
     chrome.storage.local.get("preferences"),
     chrome.storage.session.get("session"),
     chrome.bookmarks.getTree(),
     chrome.tabs.query({ windowType: "normal" }),
     chrome.windows.getCurrent(),
     chrome.commands.getAll()
-  ]);
-  const prefs = migrate(local.preferences);
-  if (!prefs.bookmarkRootId)
-    prefs.bookmarkRootId = flatten(tree).find((n) => n.folderType === "bookmarks-bar")?.id ?? null;
+  ]).then(([local, stored, tree, tabs, win, bindings]) => {
+    prefs = migrate(local.preferences);
+    session = readSession(stored.session);
+    bookmarkStore = new BookmarkStore(tree);
+    tabStore = new TabStore(tabs);
+    windowId = win.id;
+    shortcuts = bindings;
+    hydrated = true;
+    for (const fn of pending.splice(0)) apply(fn);
+  });
+  return init;
+}
+async function snapshot() {
+  await start();
+  const b = bookmarkStore.drain(), t = tabStore.drain();
+  const effective = { ...prefs };
+  if (!effective.bookmarkRootId)
+    effective.bookmarkRootId = [...bookmarkStore.nodes.values()].find(
+      (n) => n.folderType === "bookmarks-bar"
+    )?.id ?? null;
+  const tabs = [...tabStore.nodes.values()];
+  const changes = {
+    bookmarks: b.changed,
+    removedBookmarks: b.removed,
+    tabs: t.changed,
+    removedTabs: t.removed,
+    session: sessionChanged,
+    preferences: preferencesChanged,
+    initial
+  };
+  initial = false;
+  sessionChanged = false;
+  preferencesChanged = false;
   return {
-    prefs,
-    session: readSession(session.session),
-    tree,
+    prefs: effective,
+    needsSetup: prefs.bookmarkRootId === null,
+    session,
+    tree: bookmarkStore.roots,
     tabs,
-    windowId: win.id,
-    active: tabs.find((t) => t.windowId === win.id && t.active),
-    shortcuts
+    windowId,
+    active: tabs.find((t2) => t2.windowId === windowId && t2.active),
+    shortcuts,
+    bookmarks: bookmarkStore,
+    changes
   };
 }
-async function preferences(prefs) {
-  await chrome.storage.local.set({ preferences: migrate(prefs) });
+async function preferences(p) {
+  await chrome.storage.local.set({ preferences: migrate(p) });
 }
 async function request(action, args = {}) {
   const response = await chrome.runtime.sendMessage({ action, ...args });
   if (!response?.ok)
     throw new Error(
-      response?.error ?? "Ox could not complete this action. Please try again."
+      response?.error ?? "arcify could not complete this action. Please try again."
     );
   return response.value;
 }
@@ -328,7 +655,7 @@ async function refresh() {
   state = await snapshot();
   theme(state);
   app.replaceChildren(
-    el("h1", "Ox"),
+    el("h1", "arcify"),
     el("p", "A quieter place for your tabs.", "muted")
   );
   const label = el("label", "Bookmark folder");
@@ -416,6 +743,19 @@ async function refresh() {
       "p",
       "Right-click rows for actions. Favourites are local references to native bookmarks. Removing a favourite preserves the bookmark. Deleting a bookmark is a separate confirmed action."
     ),
+    el("h2", "Appearance and icons"),
+    el(
+      "p",
+      "System follows the browser\u2019s light/dark appearance signal live. Explicit Light or Dark overrides it. Chrome custom-theme colours are not available through the allowed APIs."
+    ),
+    el(
+      "p",
+      "Selected website icons are packaged locally. Other sites use local monograms or your chosen emoji. The approved favicon permission reads Chrome\u2019s extension-local favicon endpoint. On load failure, packaged website icons or local monograms are used. Chrome may return its own generic icon for a cache miss. No external favicon service is called."
+    ),
+    el(
+      "p",
+      "The Arc logo and website marks belong to their respective owners and are excluded from the source MIT licence. arcify is an independent project, without affiliation or endorsement."
+    ),
     el("h2", "Privacy"),
     el(
       "p",
@@ -423,11 +763,11 @@ async function refresh() {
     ),
     el(
       "p",
-      "Chrome may sync native bookmarks according to your browser settings. Uninstall removes Ox preferences, but does not undo confirmed bookmark changes."
+      "Chrome may sync native bookmarks according to your browser settings. Uninstall removes arcify preferences, but does not undo confirmed bookmark changes."
     ),
-    el("p", "Source: github.com/hcassar93/ox-chrome \xB7 MIT licence"),
+    el("p", "Source: github.com/hcassar93/arcify \xB7 MIT licence"),
     button("Reset extension preferences\u2026", async () => {
-      if (confirm("Reset Ox preferences? Native bookmarks will be preserved.")) {
+      if (confirm("Reset arcify preferences? Native bookmarks will be preserved.")) {
         await preferences({ ...defaults });
         await refresh();
       }

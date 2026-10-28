@@ -1,3 +1,4 @@
+import { icon, siteIcon } from "./icons";
 import {
   snapshot,
   watch,
@@ -6,58 +7,29 @@ import {
   type Snapshot,
 } from "./browser";
 import { flatten } from "./model";
-import { resolve } from "./resolver";
-import { SearchIndex, type Entry } from "./search";
-import { commands, type CommandId } from "./commands";
-import { el, button, safely, theme, runCommand, monogram } from "./ui";
+import { type Entry } from "./search";
+import { SearchCatalog } from "./catalog";
+import { type CommandId } from "./commands";
+import {
+  el,
+  button,
+  safely,
+  theme,
+  runCommand,
+  bookmarkMenu,
+  tabMenu,
+} from "./ui";
 let state: Snapshot;
 let selected = 0;
 let results: Entry[] = [];
-const index = new SearchIndex();
+const catalog = new SearchCatalog();
+const index = catalog.index;
 const input = document.querySelector<HTMLInputElement>("#query")!,
   list = document.querySelector<HTMLElement>("#results")!;
 async function refresh() {
   state = await snapshot();
   theme(state);
-  const entries: Entry[] = state.tabs.map((t) => ({
-    id: String(t.id),
-    kind: "tab",
-    title: t.title ?? "Untitled tab",
-    detail:
-      (t.windowId !== state.windowId ? "Other window · " : "") + (t.url ?? ""),
-    windowId: t.windowId,
-    tabId: t.id,
-    recent:
-      state.session.mru.indexOf(t.id!) < 0
-        ? 1e9
-        : state.session.mru.indexOf(t.id!),
-  }));
-  for (const b of flatten(state.tree)) {
-    if (!b.parentId) continue;
-    const t = b.url
-      ? resolve(b, state.windowId, state.tabs, state.session)
-      : undefined;
-    entries.push({
-      id: b.id,
-      kind: b.url ? "bookmark" : "folder",
-      title: b.title || "Untitled",
-      detail: [b.path, b.url].filter(Boolean).join(" · "),
-      url: b.url,
-      tabId: t?.id,
-      open: !!t,
-      windowId: t?.windowId,
-    });
-  }
-  for (const c of commands)
-    if (!c.needsTab || state.active)
-      entries.push({
-        id: c.id,
-        kind: "command",
-        title: c.label,
-        detail: "Browser action",
-        aliases: c.aliases,
-      });
-  index.replace(entries);
+  catalog.update(state);
   render();
 }
 function render() {
@@ -84,14 +56,22 @@ function render() {
     row.id = "result-" + i;
     row.role = "option";
     row.setAttribute("aria-selected", String(i === selected));
-    const icon = el(
-      "span",
+    const symbol = el("span", "", "result-icon");
+    const appearance =
+      result.kind === "tab"
+        ? state.session.tabCustomizations?.[result.id]
+        : state.prefs.customizations?.[result.id];
+    symbol.append(
       result.kind === "command"
-        ? "⌘"
-        : result.kind === "folder"
-          ? "▹"
-          : monogram(result.title),
-      "result-icon",
+        ? icon("command")
+        : result.kind === "folder" && !appearance?.image && !appearance?.emoji
+          ? icon("folder")
+          : siteIcon(
+              result.title,
+              result.url ?? state.tabs.find((t) => t.id === result.tabId)?.url,
+              appearance?.emoji,
+              appearance?.image,
+            ),
     );
     const copy = el("span", "", "result-copy");
     copy.append(
@@ -108,11 +88,30 @@ function render() {
             : result.kind === "url"
               ? "Open URL"
               : "Run command";
-    row.append(icon, copy, el("span", action, "result-action"));
+    row.append(symbol, copy, el("span", action, "result-action"));
     row.onpointermove = (e) => {
       if (e.movementX || e.movementY) {
         selected = i;
         select();
+      }
+    };
+    const context = () => {
+      if (result.kind === "tab") {
+        const t = state.tabs.find((t) => t.id === result.tabId);
+        if (t) tabMenu(row, t, state);
+      } else if (result.kind === "bookmark" || result.kind === "folder") {
+        const b = flatten(state.tree).find((b) => b.id === result.id);
+        if (b) bookmarkMenu(row, b, state, result.tabId);
+      }
+    };
+    row.oncontextmenu = (e) => {
+      e.preventDefault();
+      context();
+    };
+    row.onkeydown = (e) => {
+      if (e.key === "F10" && e.shiftKey) {
+        e.preventDefault();
+        context();
       }
     };
     list.append(row);
@@ -194,6 +193,7 @@ document.addEventListener("keydown", (e) => {
     window.close();
   }
 });
+document.querySelector(".palette-search")?.prepend(icon("search"));
 watch(() => void safely(refresh));
 void safely(refresh);
 input.focus();

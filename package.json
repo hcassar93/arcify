@@ -1,5 +1,5 @@
 {
-  "name": "ox-chrome",
+  "name": "arcify",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -21,6 +21,7 @@
     "@types/node": "24.10.0",
     "esbuild": "0.25.12",
     "eslint": "9.39.1",
+    "playwright-core": "1.56.1",
     "prettier": "3.6.2",
     "tsx": "4.20.6",
     "typescript": "5.9.3",

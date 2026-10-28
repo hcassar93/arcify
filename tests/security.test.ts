@@ -5,6 +5,7 @@ const manifest = JSON.parse(readFileSync("public/manifest.json", "utf8"));
 test("manifest has exactly the permission contract", () => {
   assert.deepEqual(manifest.permissions.sort(), [
     "bookmarks",
+    "favicon",
     "sidePanel",
     "storage",
     "tabs",

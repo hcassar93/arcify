@@ -14,7 +14,7 @@ Status on 2026-10-28: **1 pass, 0 observed native failures, 23 incomplete/blocke
 | A08 | Incomplete | Deterministic favourite/tree ownership and extra live duplicate test passes; real presentation pending. |
 | A09 | Incomplete | Persistence/active-child code and preview nesting inspected. Collapsed active-child real UI pending. |
 | A10 | Incomplete | Event refresh, missing-ID pruning and managed-write guards implemented. External/managed Chrome behavior pending. |
-| A11 | Incomplete | Cycle guard unit tests pass; drag/drop and complete keyboard equivalence not accepted. Same-folder indices need real verification. |
+| A11 | Incomplete | Cycle guard unit tests pass; shared before/after/inside placement and keyboard earlier/later/menu moves implemented and unit tested. Real drag/keyboard verification pending. |
 | A12 | Incomplete | Worker routes select/close/mute/pin/reload/duplicate by ID. Native commands and pinned reorder pending. |
 | A13 | Blocked | Owning-window focus is implemented; real multi-window focus untested. |
 | A14 | Incomplete | Ranking/prefixes/dedup/no-match/bounds tested; palette preview inspected. Physical modifiers and IME pending. |
@@ -22,11 +22,11 @@ Status on 2026-10-28: **1 pass, 0 observed native failures, 23 incomplete/blocke
 | A16 | Blocked | Website/video fullscreen not tested; no injected overlays implemented. |
 | A17 | Blocked | Top-level listeners, ports and session state implemented. Worker suspension/rapid panel toggle untested. |
 | A18 | Blocked | Startup clears session identities; exact URL reconstruction logic tested. Full native restart not tested. |
-| A19 | Incomplete | Light preview inspected; dark/narrow/200%/keyboard/reduced-motion native regression pending. |
+| A19 | Incomplete | Light/dark and narrow synthetic rendering checked; native 200%/keyboard/reduced-motion regression pending. |
 | A20 | Blocked | No runtime clients/assets; offline listing/switching in real Chrome not tested. |
 | A21 | Blocked | Source/build client/resource scans and CSP pass. No extension-page or service-worker runtime traffic trace captured. |
 | A22 | Incomplete | Unsafe schemes/credentials rejected; textContent-only rendering audit passes. Malicious-title rendered native test pending. |
-| A23 | Pass | Source and built manifest exactly tabs/bookmarks/storage/sidePanel, incognito disabled, no hosts/content scripts/remote resources. npm run audit:build passes. |
+| A23 | Pass | Source and built manifest exactly tabs/bookmarks/storage/sidePanel/favicon, incognito disabled, no hosts/content scripts/remote resources. npm run audit:build passes. |
 | A24 | Incomplete | Search computation p95 in qa/benchmark.json meets 50 ms. DOM update/typing/scrolling p95 in installed Chrome not measured. |
 
 ## Native completion procedure

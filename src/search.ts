@@ -36,13 +36,25 @@ export class SearchIndex {
     this.upsert(entries);
   }
   upsert(entries: Entry[]): void {
-    for (const entry of entries)
-      this.entries.set(entry.kind + ":" + entry.id, {
-        entry,
-        title: norm(entry.title),
-        other: norm(entry.detail + " " + (entry.aliases ?? "")),
-      });
+    for (const entry of entries) {
+      const key = entry.kind + ":" + entry.id;
+      const previous = this.entries.get(key);
+      if (
+        previous &&
+        previous.entry.title === entry.title &&
+        previous.entry.detail === entry.detail &&
+        previous.entry.aliases === entry.aliases
+      )
+        previous.entry = entry;
+      else
+        this.entries.set(key, {
+          entry,
+          title: norm(entry.title),
+          other: norm(entry.detail + " " + (entry.aliases ?? "")),
+        });
+    }
   }
+
   remove(kind: Kind, id: string): void {
     this.entries.delete(kind + ":" + id);
   }

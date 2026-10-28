@@ -7,7 +7,7 @@ async function refresh() {
   state = await snapshot();
   theme(state);
   app.replaceChildren(
-    el("h1", "Ox"),
+    el("h1", "arcify"),
     el("p", "A quieter place for your tabs.", "muted"),
   );
   const label = el("label", "Bookmark folder");
@@ -101,6 +101,19 @@ async function refresh() {
       "p",
       "Right-click rows for actions. Favourites are local references to native bookmarks. Removing a favourite preserves the bookmark. Deleting a bookmark is a separate confirmed action.",
     ),
+    el("h2", "Appearance and icons"),
+    el(
+      "p",
+      "System follows the browser’s light/dark appearance signal live. Explicit Light or Dark overrides it. Chrome custom-theme colours are not available through the allowed APIs.",
+    ),
+    el(
+      "p",
+      "Selected website icons are packaged locally. Other sites use local monograms or your chosen emoji. The approved favicon permission reads Chrome’s extension-local favicon endpoint. On load failure, packaged website icons or local monograms are used. Chrome may return its own generic icon for a cache miss. No external favicon service is called.",
+    ),
+    el(
+      "p",
+      "The Arc logo and website marks belong to their respective owners and are excluded from the source MIT licence. arcify is an independent project, without affiliation or endorsement.",
+    ),
     el("h2", "Privacy"),
     el(
       "p",
@@ -108,12 +121,12 @@ async function refresh() {
     ),
     el(
       "p",
-      "Chrome may sync native bookmarks according to your browser settings. Uninstall removes Ox preferences, but does not undo confirmed bookmark changes.",
+      "Chrome may sync native bookmarks according to your browser settings. Uninstall removes arcify preferences, but does not undo confirmed bookmark changes.",
     ),
-    el("p", "Source: github.com/hcassar93/ox-chrome · MIT licence"),
+    el("p", "Source: github.com/hcassar93/arcify · MIT licence"),
     button("Reset extension preferences…", async () => {
       if (
-        confirm("Reset Ox preferences? Native bookmarks will be preserved.")
+        confirm("Reset arcify preferences? Native bookmarks will be preserved.")
       ) {
         await preferences({ ...defaults });
         await refresh();

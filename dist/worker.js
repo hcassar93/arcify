@@ -1,3 +1,43 @@
+// src/appearance.ts
+function validateAppearance(raw) {
+  if (!raw || typeof raw !== "object") return {};
+  const v = raw, out = {};
+  if (v.name !== void 0) {
+    if (typeof v.name !== "string" || v.name.length > 120)
+      throw new Error("Display names must be at most 120 characters.");
+    if (v.name.trim()) out.name = v.name.trim();
+  }
+  if (v.emoji !== void 0) {
+    if (typeof v.emoji !== "string" || v.emoji.length > 16)
+      throw new Error("Choose a short icon or emoji.");
+    if (v.emoji.trim()) out.emoji = v.emoji.trim();
+  }
+  if (v.image !== void 0) {
+    if (typeof v.image !== "string" || v.image.length > 1e5 || !/^data:image\/png;base64,iVBORw0KGgo[A-Za-z0-9+/=]+$/.test(v.image))
+      throw new Error("Choose a validated PNG image.");
+    out.image = v.image;
+  }
+  return out;
+}
+function readAppearances(raw) {
+  const result = {};
+  if (!raw || typeof raw !== "object") return result;
+  for (const [id, value] of Object.entries(raw)) {
+    if (["__proto__", "constructor", "prototype"].includes(id)) continue;
+    try {
+      result[id] = validateAppearance(value);
+    } catch {
+    }
+  }
+  return JSON.stringify(result).length <= 2e6 ? result : {};
+}
+function checkAppearanceQuota(value) {
+  if (JSON.stringify(value).length > 2e6)
+    throw new Error(
+      "Custom images use 2 MB. Remove an image before adding another."
+    );
+}
+
 // src/model.ts
 var defaults = {
   schemaVersion: 1,
@@ -19,6 +59,7 @@ function migrate(raw) {
   const p = raw && typeof raw === "object" ? raw : {};
   return {
     ...defaults,
+    customizations: readAppearances(p.customizations),
     bookmarkRootId: typeof p.bookmarkRootId === "string" ? p.bookmarkRootId : null,
     favourites: ids(p.favourites).slice(0, 12),
     expanded: ids(p.expanded),
@@ -56,6 +97,11 @@ function pruneSession(s, tabs, bookmarks) {
     ...emptySession(),
     ...s,
     associations,
+    tabCustomizations: Object.fromEntries(
+      Object.entries(s.tabCustomizations ?? {}).filter(
+        ([id]) => valid.has(Number(id))
+      )
+    ),
     mru: (s.mru ?? []).filter((id) => valid.has(id))
   };
 }
@@ -90,6 +136,7 @@ function readSession(raw) {
       )
     );
   }
+  result.tabCustomizations = readAppearances(s.tabCustomizations);
   result.mru = Array.isArray(s.mru) ? [
     ...new Set(
       s.mru.filter((id) => Number.isInteger(id) && id >= 0)
@@ -101,6 +148,34 @@ function readSession(raw) {
     if (/^\d+$/.test(w) && (state === "normal" || state === "maximized"))
       result.fullscreen[w] = state;
   return result;
+}
+
+// src/order.ts
+function bookmarkPlacement(source, target, placement, all) {
+  const parent = placement === "inside" ? target : all.find((b) => b.id === target.parentId);
+  if (!parent || !canMove(source, parent, all) || source.id === target.id)
+    throw new Error("Choose a writable destination outside this folder.");
+  if (placement === "inside") return { parentId: parent.id };
+  const siblings = all.filter((b) => b.parentId === parent.id && b.id !== source.id).sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+  const targetIndex = siblings.findIndex((b) => b.id === target.id);
+  if (targetIndex < 0)
+    throw new Error("The destination moved. Please try again.");
+  return {
+    parentId: parent.id,
+    index: targetIndex + (placement === "after" ? 1 : 0)
+  };
+}
+function reorderIDs(ids2, source, target, placement) {
+  if (source === target) return [...ids2];
+  if (!ids2.includes(source) || !ids2.includes(target))
+    throw new Error("This favourite is no longer available.");
+  const list = ids2.filter((id) => id !== source);
+  list.splice(
+    list.indexOf(target) + (placement === "after" ? 1 : 0),
+    0,
+    source
+  );
+  return list;
 }
 
 // src/navigation.ts
@@ -291,6 +366,16 @@ var reconcile = () => {
         p.favourites = p.favourites.filter(
           (id) => all.some((b) => b.id === id)
         );
+        p.customizations = Object.fromEntries(
+          Object.entries(p.customizations ?? {}).filter(
+            ([id]) => all.some((b) => b.id === id)
+          )
+        );
+        p.icons = Object.fromEntries(
+          Object.entries(p.icons).filter(
+            ([id]) => all.some((b) => b.id === id)
+          )
+        );
         p.expanded = p.expanded.filter((id) => all.some((b) => b.id === id));
         await chrome.storage.local.set({ preferences: p });
       }
@@ -304,6 +389,10 @@ chrome.tabs.onDetached.addListener(reconcile);
 chrome.tabs.onReplaced.addListener((added, removed) => {
   void ready.then(
     () => serial(async () => {
+      if (session.tabCustomizations?.[removed]) {
+        session.tabCustomizations[added] = session.tabCustomizations[removed];
+        delete session.tabCustomizations[removed];
+      }
       for (const a of Object.values(session.associations))
         for (const id of Object.keys(a)) if (a[id] === removed) a[id] = added;
       await save();
@@ -334,6 +423,33 @@ async function run(m) {
     return chrome.tabs.get(m.tabId);
   };
   switch (m.action) {
+    case "customize": {
+      const appearance = validateAppearance(m.appearance);
+      if (m.bookmarkId) {
+        await bookmark(m.bookmarkId);
+        const prefs = migrate(
+          (await chrome.storage.local.get("preferences")).preferences
+        );
+        const items = { ...prefs.customizations };
+        if (Object.keys(appearance).length) items[m.bookmarkId] = appearance;
+        else delete items[m.bookmarkId];
+        checkAppearanceQuota(items);
+        delete prefs.icons[m.bookmarkId];
+        await chrome.storage.local.set({
+          preferences: { ...prefs, customizations: items }
+        });
+      } else {
+        const t = await tab();
+        const items = { ...session.tabCustomizations };
+        if (Object.keys(appearance).length) items[String(t.id)] = appearance;
+        else delete items[String(t.id)];
+        checkAppearanceQuota(items);
+        const next = { ...session, tabCustomizations: items };
+        await chrome.storage.session.set({ session: next });
+        session = next;
+      }
+      return;
+    }
     case "activate": {
       if (w === void 0) throw new Error("No originating window.");
       const resolver = new SavedResolver(
@@ -380,7 +496,7 @@ async function run(m) {
     case "duplicate": {
       const t = await tab();
       if (w === void 0) throw new Error("No originating window.");
-      return openURL(t.url ?? "", w);
+      return openURL(t.url ?? "", w, true);
     }
     case "move-tab": {
       const t = await tab();
@@ -438,12 +554,51 @@ async function run(m) {
       return b.url ? chrome.bookmarks.remove(b.id) : chrome.bookmarks.removeTree(b.id);
     }
     case "move": {
-      const b = await bookmark(m.bookmarkId), p = await bookmark(m.parentId), all = flatten(await chrome.bookmarks.getTree());
-      if (!canMove(b, p, all))
-        throw new Error(
-          "This move would create a cycle or use a read-only folder."
+      const b = await bookmark(m.bookmarkId), all = flatten(await chrome.bookmarks.getTree());
+      let destination2;
+      if (m.targetId) {
+        destination2 = bookmarkPlacement(
+          b,
+          await bookmark(m.targetId),
+          m.placement ?? "inside",
+          all
         );
-      return chrome.bookmarks.move(b.id, { parentId: p.id, index: m.index });
+      } else if (m.direction) {
+        const siblings = all.filter((n) => n.parentId === b.parentId).sort((a, b2) => (a.index ?? 0) - (b2.index ?? 0));
+        const index = siblings.findIndex((n) => n.id === b.id);
+        const target = siblings[index + (m.direction === "earlier" ? -1 : 1)];
+        if (!target) return b;
+        destination2 = bookmarkPlacement(
+          b,
+          target,
+          m.direction === "earlier" ? "before" : "after",
+          all
+        );
+      } else {
+        const p = await bookmark(m.parentId);
+        if (!canMove(b, p, all))
+          throw new Error(
+            "This move would create a cycle or use a read-only folder."
+          );
+        destination2 = { parentId: p.id, index: m.index };
+      }
+      return chrome.bookmarks.move(b.id, destination2);
+    }
+    case "reorder-favourite": {
+      const p = migrate(
+        (await chrome.storage.local.get("preferences")).preferences
+      );
+      const id = m.bookmarkId ?? "";
+      const position = p.favourites.indexOf(id);
+      const target = m.targetId ?? p.favourites[position + (m.direction === "earlier" ? -1 : 1)];
+      if (!target) return;
+      p.favourites = reorderIDs(
+        p.favourites,
+        id,
+        target,
+        m.placement === "after" || m.direction === "later" ? "after" : "before"
+      );
+      return chrome.storage.local.set({ preferences: p });
     }
     case "favourite": {
       const b = await bookmark(m.bookmarkId);

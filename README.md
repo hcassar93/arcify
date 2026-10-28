@@ -1,4 +1,4 @@
-# Ox
+# arcify
 
 A local-first Chrome sidebar and command palette, inspired by Arc's hierarchy. MIT licensed; no backend, account, telemetry, remote assets, or runtime dependencies.
 
@@ -8,7 +8,7 @@ A local-first Chrome sidebar and command palette, inspired by Arc's hierarchy. M
 
 These images render the actual bundled UI with synthetic Chrome API fixtures in headless installed Chrome. They are not screenshots of an installed extension and do not prove native behavior.
 
-[Sidebar preview](docs/qa/sidebar-preview.png) · [Command palette preview](docs/qa/palette-preview.png)
+[Light sidebar](docs/qa/arcify-sidebar-light.png) · [Dark sidebar](docs/qa/arcify-sidebar-dark.png) · [Light palette](docs/qa/arcify-palette-light.png) · [Dark palette](docs/qa/arcify-palette-dark.png) · [Appearance editor](docs/qa/arcify-appearance-editor.png)
 
 ## Build and load
 
@@ -23,24 +23,28 @@ Dependencies may require internet access at build time. `dist/` is committed and
 
 1. Use a disposable Chrome profile first, with synthetic bookmarks only.
 2. Open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select this repository's **dist** directory. Enterprise policy may require administrator approval; do not bypass it.
-3. Open Ox from the toolbar. Use **Settings** to choose a bookmark folder. The default uses Chrome's `folderType` data, not a translated title or hardcoded ID.
-4. After rebuilding, click **Reload** on the Ox card in `chrome://extensions`, then reopen the panel and popup.
+3. Open arcify from the toolbar. Use **Settings** to choose a bookmark folder. The default uses Chrome's `folderType` data, not a translated title or hardcoded ID.
+4. After rebuilding, click **Reload** on the arcify card in `chrome://extensions`, then reopen the panel and popup.
 
-Suggested shortcuts: **Command+Shift+K** palette and **Command+Shift+Y** sidebar on macOS; **Control+Shift+K/Y** elsewhere. Chrome decides whether these are assigned. Ox Settings shows `commands.getAll()` results or **Not assigned**. Configure them at `chrome://extensions/shortcuts`. Shortcut open/close delivery remains a native QA gate.
+Suggested shortcuts: **Command+Shift+K** palette and **Command+Shift+Y** sidebar on macOS; **Control+Shift+K/Y** elsewhere. Chrome decides whether these are assigned. arcify Settings shows `commands.getAll()` results or **Not assigned**. Configure them at `chrome://extensions/shortcuts`. Shortcut open/close delivery remains a native QA gate.
 
 Search supports `>` actions, `@` tabs and `#` bookmarks. Up/Down selects, Enter activates, and Command+Enter/Control+Enter deliberately opens a new tab. Search never goes to a web search service. An explicit HTTP(S) URL or recognisable domain offers Open URL. Context menus distinguish Close live tab, Remove from favourites and Delete bookmark. Bookmark writes require an explicit user action; installation does not edit bookmarks.
 
 ## Permissions and privacy
 
-Exactly `tabs`, `bookmarks`, `storage`, `sidePanel`. No host permissions or content scripts. `tabs` exposes titles and URLs, and Chrome may describe it as reading browsing history; it does not grant DOM access. `bookmarks` grants reading and writing together—Chrome has no read-only version. Preferences use `storage.local`, associations use `storage.session`; never `storage.sync`. Chrome itself may sync native bookmarks under existing browser settings.
+Exactly `tabs`, `bookmarks`, `storage`, `sidePanel`, `favicon`. No host permissions or content scripts. `tabs` exposes titles and URLs, and Chrome may describe it as reading browsing history; it does not grant DOM access. `bookmarks` grants reading and writing together—Chrome has no read-only version. Preferences use `storage.local`, associations use `storage.session`; never `storage.sync`. Chrome itself may sync native bookmarks under existing browser settings.
 
-All resources are packaged. The explicit CSP disallows connections and remote code. Permission restrictions are not a mathematical exfiltration guarantee: navigating to a user-selected URL can transmit data to that destination. Ox never attaches context to destinations. See [PRIVACY](PRIVACY.md) and [SECURITY](SECURITY.md).
+All resources are packaged. The explicit CSP disallows connections and remote code. Permission restrictions are not a mathematical exfiltration guarantee: navigating to a user-selected URL can transmit data to that destination. arcify never attaches context to destinations. See [PRIVACY](PRIVACY.md) and [SECURITY](SECURITY.md).
 
 ## Differences from Arc and known limitations
 
-Chrome owns the side-panel header, width and placement. Choose left/right under Chrome Settings → Appearance. The palette is a native toolbar popup, not a centred webpage overlay. Ox does not hide native tabs, inject into websites, archive tabs, implement Spaces, or provide web search. Normal browser fullscreen and website fullscreen are different; neither has been accepted on this test environment. Do not rely on fullscreen or shortcut toggle behavior until the manual gates pass.
+Chrome owns the side-panel header, width and placement. Choose left/right under Chrome Settings → Appearance. The palette is a native toolbar popup, not a centred webpage overlay. arcify does not hide native tabs, inject into websites, archive tabs, implement Spaces, or provide web search. Normal browser fullscreen and website fullscreen are different; neither has been accepted on this test environment. Do not rely on fullscreen or shortcut toggle behavior until the manual gates pass.
 
-Implementation gaps still requiring work/verification: full incremental browser-store reconciliation (current snapshots rebuild on browser events, never per keystroke); bounded rendering of very large saved trees; complete keyboard ordering equivalents for bookmark moves; exact same-folder drag indices; full two-pass native visual QA; end-to-end rendered performance and runtime network inspection. Managed-node failures are reported, but all policy edge cases need real-profile testing. The options page and some action flows need further accessibility review.
+Incremental bookmark/tab stores and search updates, bounded tree pagination, and keyboard move/reorder equivalents are implemented. Native drag/drop, fullscreen, shortcut delivery, worker suspension, restart, runtime network traces and policy edge cases remain unverified. Synthetic rendered input-to-layout performance meets the target; this is not a native popup measurement.
+
+Use **Customize appearance…** in a tab, favourite, bookmark or folder context menu (Shift+F10 is supported) for a local name, emoji or local raster image. Reset to original preserves bookmarks. Saved-item overrides persist by bookmark ID; live-tab overrides use session storage, follow navigation/replacement and disappear on close or browser restart. PNG/JPEG/WebP inputs are limited to 2 MB and 4096 pixels per dimension, re-encoded as PNG at most 128 pixels, with a 2 MB customization budget. Native bookmark rename remains a separate action.
+
+System theme reacts to browser/system `prefers-color-scheme`; explicit light/dark overrides are available. Chrome custom-theme colour values are not exposed through this permission contract. Approved `favicon` permission uses Chrome's extension-local cache endpoint, with packaged/monogram fallbacks on load failure. A cache miss can return Chrome's generic icon. Actual cache behavior and extension-worker traffic remain native QA gates. Arc logo and packaged third-party icons have separate provenance in [THIRD_PARTY_ASSETS](THIRD_PARTY_ASSETS.md); source MIT does not relicense those assets.
 
 Reset preferences preserves bookmarks. Uninstall removes extension storage but does not undo user-confirmed native bookmark edits. No Chrome Web Store publication or auto-updater is configured.
 

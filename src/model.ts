@@ -1,7 +1,9 @@
+import { readAppearances, type Appearance } from "./appearance";
 export type Bookmark = chrome.bookmarks.BookmarkTreeNode;
 export type Tab = chrome.tabs.Tab;
 export interface Preferences {
   schemaVersion: 1;
+  customizations?: Record<string, Appearance>;
   bookmarkRootId: string | null;
   favourites: string[];
   icons: Record<string, string>;
@@ -10,6 +12,7 @@ export interface Preferences {
   theme: "system" | "light" | "dark";
 }
 export interface Session {
+  tabCustomizations?: Record<string, Appearance>;
   associations: Record<string, Record<string, number>>;
   mru: number[];
   panels: Record<string, boolean>;
@@ -38,6 +41,7 @@ export function migrate(raw: unknown): Preferences {
   const p = raw && typeof raw === "object" ? (raw as Partial<Preferences>) : {};
   return {
     ...defaults,
+    customizations: readAppearances(p.customizations),
     bookmarkRootId:
       typeof p.bookmarkRootId === "string" ? p.bookmarkRootId : null,
     favourites: ids(p.favourites).slice(0, 12),
@@ -84,6 +88,11 @@ export function pruneSession(
     ...emptySession(),
     ...s,
     associations,
+    tabCustomizations: Object.fromEntries(
+      Object.entries(s.tabCustomizations ?? {}).filter(([id]) =>
+        valid.has(Number(id)),
+      ),
+    ),
     mru: (s.mru ?? []).filter((id) => valid.has(id)),
   };
 }
@@ -134,6 +143,7 @@ export function readSession(raw: unknown): Session {
       ),
     ) as Record<string, number>;
   }
+  result.tabCustomizations = readAppearances(s.tabCustomizations);
   result.mru = Array.isArray(s.mru)
     ? [
         ...new Set(
