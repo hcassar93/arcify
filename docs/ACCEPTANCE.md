@@ -1,42 +1,38 @@
 # Acceptance matrix
 
-Status on 2026-10-28: **1 pass, 0 observed native failures, 23 incomplete/blocked**. A passing synthetic test is supporting evidence, not a native acceptance pass. A23 is the static source/build gate only. Native installation was not attempted in the production profile. No installed-extension screenshot exists.
+2026-10-28: **9 pass, 15 incomplete/blocked**. Passes are A02–A07, A12, A13 and A23. Native observations use signed-out **Arcify QA Temporary** in running Google Chrome 155.0.8059.85. Automated results are supporting evidence, not substitutes for native checks. See [native report](NATIVE-QA.md) for steps, defects, captures and exact limitations. This is not release sign-off.
 
 | ID | Status | Evidence / remaining verification |
 | --- | --- | --- |
-| A01 | Blocked | Mock worker startup makes no tab/bookmark mutations; manifest audit passes. Fresh real install and startup network trace pending. |
-| A02 | Blocked | Suggested declarations and actual-bindings UI implemented; physical open/close shortcut delivery untested. |
-| A03 | Blocked | Input autofocus and dismissal implemented; content focus preservation requires native popup/panel test. |
-| A04 | Incomplete | Resolver and worker concurrent-click tests pass; associated reuse and redirected reuse exercised synthetically. Real clicks pending. |
-| A05 | Incomplete | Worker test confirms exactly one deliberate additional tab; real Chrome pending. |
-| A06 | Incomplete | Pruning retains bookmarks and removes invalid associations; real close/reopen pending. |
-| A07 | Incomplete | Worker test preserves redirect until explicit reset; native navigation pending. |
-| A08 | Incomplete | Deterministic favourite/tree ownership and extra live duplicate test passes; real presentation pending. |
-| A09 | Incomplete | Persistence/active-child code and preview nesting inspected. Collapsed active-child real UI pending. |
-| A10 | Incomplete | Event refresh, missing-ID pruning and managed-write guards implemented. External/managed Chrome behavior pending. |
-| A11 | Incomplete | Cycle guard unit tests pass; shared before/after/inside placement and keyboard earlier/later/menu moves implemented and unit tested. Real drag/keyboard verification pending. |
-| A12 | Incomplete | Worker routes select/close/mute/pin/reload/duplicate by ID. Native commands and pinned reorder pending. |
-| A13 | Blocked | Owning-window focus is implemented; real multi-window focus untested. |
-| A14 | Incomplete | Ranking/prefixes/dedup/no-match/bounds tested; palette preview inspected. Physical modifiers and IME pending. |
-| A15 | Blocked | Fullscreen state preservation implemented; native fullscreen/palette focus unavailable for QA. |
-| A16 | Blocked | Website/video fullscreen not tested; no injected overlays implemented. |
-| A17 | Blocked | Top-level listeners, ports and session state implemented. Worker suspension/rapid panel toggle untested. |
-| A18 | Blocked | Startup clears session identities; exact URL reconstruction logic tested. Full native restart not tested. |
-| A19 | Incomplete | Light/dark and narrow synthetic rendering checked; native 200%/keyboard/reduced-motion regression pending. |
-| A20 | Blocked | No runtime clients/assets; offline listing/switching in real Chrome not tested. |
-| A21 | Blocked | Source/build client/resource scans and CSP pass. No extension-page or service-worker runtime traffic trace captured. |
-| A22 | Incomplete | Unsafe schemes/credentials rejected; textContent-only rendering audit passes. Malicious-title rendered native test pending. |
-| A23 | Pass | Source and built manifest exactly tabs/bookmarks/storage/sidePanel/favicon/downloads, incognito disabled, no hosts/content scripts/remote resources. npm run audit:build passes. |
-| A24 | Incomplete | Search computation p95 in qa/benchmark.json meets 50 ms. DOM update/typing/scrolling p95 in installed Chrome not measured. |
+| A01 | Incomplete | Actual unpacked install enabled without manifest errors; fresh bookmark bar was empty before synthetic seeding. Startup mutation mock and source audit pass. Comprehensive install-time network trace missing. |
+| A02 | Pass | Physical ⇧⌘K and ⇧⌘Y open/close their surfaces after install/reload; actual assignments shown in Settings. Cold suspension is separately incomplete under A17. |
+| A03 | Pass | Panel preserves selected content tab; fresh popup query accepts typing; successful tab activation dismisses popup and focuses content. Nested Escape defect fixed and natively retested. |
+| A04 | Pass | Repeated native favourite activation reuses associated Example home with no additional tabs. Shared resolver tests cover both surfaces. |
+| A05 | Pass | Explicit favourite Open new tab added exactly one tab. |
+| A06 | Pass | Closed associated tab without deleting favourite/bookmark; after closing remaining duplicate, activation created one replacement. |
+| A07 | Pass | Associated live tab navigated to a changed query; association remained; explicit Reset restored saved URL. |
+| A08 | Incomplete | Extra live duplicate appeared under Open tabs. Duplicate-bookmark ownership unit tests pass; two-bookmark native permutation untested. |
+| A09 | Incomplete | One-level folder persistence and single collapsed active-child observed; deeper nesting and arrow-key permutations pending. |
+| A10 | Incomplete | Mock events/pruning/managed guards pass. Native create/move observed; external edit/removal/managed-node matrix pending. |
+| A11 | Incomplete | Native destination picker moved Design reference into Design library. Placement/cycle/order tests pass; complete native drag/drop and keyboard reorder permutations pending. |
+| A12 | Pass | Native select, close, pin, mute, reload and duplicate affected synthetic intended tabs; pin/unmute labels and tab count verified. |
+| A13 | Pass | Other window label observed; selection activated Example Domain and focused its owning QA window. |
+| A14 | Incomplete | 37 rendered checks cover ranking/prefixes/labels/IME/no-match/picker; native query/actions/picker exercised. Physical modifier/IME matrix pending. |
+| A15 | Incomplete | Browser fullscreen, visible panel, popup input and normal restoration observed. Multi-window restoration moved focus to another QA window; maximize/focus matrix unresolved. |
+| A16 | Incomplete | Synthetic webpage requestFullscreen and Escape tested, Chrome retained its panel; video-element fullscreen untested. |
+| A17 | Incomplete | Worker inactive was observed. Two cold shortcut attempts showed no visible transition before reload; post-reload toggles worked. Suspension and rapid-toggle gate remains unresolved. |
+| A18 | Blocked | Full process restart would close production windows because safe QA profile shares the running Chrome process. No quit attempted. Mock startup identity clearing/exact reconstruction passes. |
+| A19 | Incomplete | Native light/dark, left/right, folder/menu states inspected; synthetic narrow/raster containment and live appearance pass. Full native 200%/reduced-motion/keyboard matrix pending. |
+| A20 | Incomplete | Page-scoped Offline DevTools setting allowed folder interaction. Whole-profile offline listing/search/switching matrix not completed. |
+| A21 | Incomplete | Worker sampled idle/search/switch trace empty; sidebar startup and folder expansion showed extension-local resources only. Complete all-surface/theme/typing traces pending. |
+| A22 | Incomplete | URL/credentials rejection and malicious text rendering tests pass. Full native malicious-title/forbidden-navigation scenario pending. |
+| A23 | Pass | Built/source permissions exactly tabs/bookmarks/storage/sidePanel/favicon/downloads, no hosts/content scripts; CSP/local-resource audit passes. |
+| A24 | Incomplete | 5000-bookmark/500-tab search and synthetic input-to-layout p95 meet 50 ms. Native popup presentation/scroll latency not measured. |
 
-## Native completion procedure
+## Additional requested features
 
-Use a new disposable profile, load `dist` through chrome://extensions, and record the exact installed manifest and `commands.getAll()` bindings. Seed only example.test bookmark/tab fixtures via normal Chrome UI or a separately reviewed test helper outside the production manifest. Record a full-frame screenshot for every required screenshot scenario in the implementation brief.
+Cached endpoint requests were observed in real Chrome; cache misses returned generic Chrome globes. A real synthetic download appeared in sidebar and palette, and Reveal selected it in Finder. Local appearance file validation, reset, cleanup, metadata stripping, quota handling, bounded Downloads metadata and missing-file guards have automated tests. Native custom-file upload and every missing-file race are not claimed passed.
 
-Run all A01–A24 scenarios, then reload the final build and repeat the full visual pass and regression. For A21 inspect DevTools Network for popup, sidebar, options and worker during startup, idle, query typing, folder expansion, theme changes and tab switching. Distinguish user-requested site traffic. For A15/A16 separately test browser-window fullscreen and website fullscreen. For A17 terminate the worker through Chrome's own tools and rapidly toggle; for A18 fully quit only the disposable Chrome process and restart that profile.
+## Completion constraints
 
-Do not change the user's production profile, disable security policy, add testing permissions, or use headless results as a substitute for these native gates.
-
-## Requested additions
-
-Cached favicon handling, local appearance validation/reset/cleanup and Downloads metadata/ranking/reveal guards have automated coverage. Synthetic previews show both themes, progress/missing-file states and the editor. Native favicon cache behavior, file-manager reveal, permission prompts and file-existence race behavior are still unverified. These additions do not change the 1 static pass / 23 incomplete original acceptance count.
+No production profile changes, security-policy bypasses, extra testing permissions, downloaded-program execution, file deletion, download-history erasure or store publication. Reliable full-frame popup capture is blocked by native capture scaling; diagnostic thumbnails are not promoted to evidence. Full restart needs an independently controllable isolated Chrome process or a user-controlled restart that preserves production work. Other incomplete rows are explicitly pending tests, not invented environmental blockers.

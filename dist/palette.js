@@ -1567,13 +1567,25 @@ input.onkeydown = (e) => {
     void safely(() => execute(results[selected], e.metaKey || e.ctrlKey));
   }
 };
-document.addEventListener("keydown", (e) => {
-  if (document.querySelector("dialog[open]")) return;
-  if (e.key === "Escape" || (e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "k") {
-    e.preventDefault();
-    window.close();
-  }
-});
+document.addEventListener(
+  "keydown",
+  (e) => {
+    const dialog = document.querySelector("dialog[open]");
+    if (dialog) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        dialog.close();
+      }
+      return;
+    }
+    if (e.key === "Escape" || (e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      window.close();
+    }
+  },
+  true
+);
 document.querySelector(".palette-search")?.prepend(icon("search"));
 watch(() => void safely(refresh));
 void safely(refresh);

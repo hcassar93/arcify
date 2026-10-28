@@ -5,11 +5,11 @@
     "samples": 100,
     "bookmarks": 5000,
     "tabs": 500,
-    "p95Ms": 4.5,
-    "maxMs": 5.399999618530273,
+    "p95Ms": 4.399999618530273,
+    "maxMs": 5.199999809265137,
     "scope": "Synthetic headless input dispatch through synchronous results DOM and forced layout; excludes native popup host and screen presentation."
   },
-  "checks": 35,
+  "checks": 37,
   "passed": [
     "sidebar: system appearance changes live",
     "sidebar: explicit light overrides dark system",
@@ -43,7 +43,9 @@
     "palette: IME Enter does not execute",
     "palette: save command opens destination picker",
     "palette: Escape dismisses nested picker",
+    "palette: nested Escape preserves palette host",
     "palette: synthetic 5000-bookmark/500-tab input-to-layout p95 under 50 ms",
+    "settings: theme write preserves newer sidebar preferences",
     "rendered pages: no uncaught errors",
     "synthetic page trace: no non-local requests (not extension worker traffic evidence)"
   ],

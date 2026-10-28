@@ -675,7 +675,10 @@ async function refresh() {
   }
   select.value = state.prefs.bookmarkRootId ?? "";
   select.onchange = () => void safely(async () => {
-    await preferences({ ...state.prefs, bookmarkRootId: select.value });
+    await preferences({
+      ...(await snapshot()).prefs,
+      bookmarkRootId: select.value
+    });
     await refresh();
   });
   label.append(select);
@@ -690,7 +693,7 @@ async function refresh() {
   choice.value = state.prefs.theme;
   choice.onchange = () => void safely(async () => {
     await preferences({
-      ...state.prefs,
+      ...(await snapshot()).prefs,
       theme: choice.value
     });
     await refresh();
@@ -709,9 +712,10 @@ async function refresh() {
     icon.placeholder = "Emoji";
     icon.ariaLabel = "Icon for " + b.title;
     icon.onchange = () => void safely(async () => {
+      const current = (await snapshot()).prefs;
       await preferences({
-        ...state.prefs,
-        icons: { ...state.prefs.icons, [id]: icon.value }
+        ...current,
+        icons: { ...current.icons, [id]: icon.value }
       });
       await refresh();
     });
@@ -719,9 +723,10 @@ async function refresh() {
       el("span", b.title),
       icon,
       button("Move up", async () => {
-        const ids2 = [...state.prefs.favourites], i = ids2.indexOf(id);
+        const current = (await snapshot()).prefs;
+        const ids2 = [...current.favourites], i = ids2.indexOf(id);
         if (i > 0) [ids2[i - 1], ids2[i]] = [ids2[i], ids2[i - 1]];
-        await preferences({ ...state.prefs, favourites: ids2 });
+        await preferences({ ...current, favourites: ids2 });
         await refresh();
       })
     );

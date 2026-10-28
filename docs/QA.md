@@ -1,3 +1,9 @@
+# QA evidence
+
+Current status: **62 automated tests and 37 rendered checks pass; 9/24 acceptance rows pass, 15 remain incomplete/blocked.** Actual unpacked installation and native testing now succeeded. [NATIVE-QA.md](NATIVE-QA.md) supersedes historical native-blocker statements below and records real screenshots, three fixes and remaining gaps. [ACCEPTANCE.md](ACCEPTANCE.md) is the current matrix.
+
+## Historical development record (before native profile recovery)
+
 # QA evidence — development preview
 
 Date: 2026-10-28. This is not a release sign-off. The full brief is preserved unchanged in IMPLEMENTATION-BRIEF.md (199 blocks, 35,696 characters).

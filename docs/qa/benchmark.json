@@ -6,7 +6,7 @@
   "bookmarks": 5000,
   "tabs": 500,
   "samples": 500,
-  "p95Ms": 2.5398750000000234,
-  "maxMs": 2.9228329999999687,
+  "p95Ms": 2.649959000000024,
+  "maxMs": 3.1722500000000196,
   "scope": "Search computation only; popup rendering and installed Chrome latency remain unmeasured."
 }

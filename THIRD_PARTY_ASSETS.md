@@ -22,3 +22,5 @@ The following publicly served identification icons were retrieved from Arc's off
 | public/site-icons/notion.png | https://arc.net/farewell/assets/fav-notion.png | Notion |
 
 No assets are downloaded at extension runtime. Unrecognised sites receive a locally generated monogram; user-selected emoji override packaged icons. No universal favicon coverage is claimed.
+
+Raster application icons use the official SVG’s existing sRGB fill values, omitting display-p3 inline styles unsupported by the rasterizer, with square padding. The source SVG is retained unchanged. This conversion does not change asset ownership or licensing.

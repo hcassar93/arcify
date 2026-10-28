@@ -173,11 +173,41 @@ try {
           .isVisible(),
         "appearance editor offers explicit reset",
       );
-      for (const [width,height] of [[128,32],[32,128],[64,64]]) {
-        const data=await page.evaluate(([w,h])=>{const c=document.createElement("canvas");c.width=w;c.height=h;const ctx=c.getContext("2d");ctx.fillStyle="#9875b5";ctx.fillRect(0,0,w,h);return c.toDataURL("image/png").split(",")[1];},[width,height]);
-        await page.locator('input[type="file"]').setInputFiles({name:"synthetic.png",mimeType:"image/png",buffer:Buffer.from(data,"base64")});
-        await page.waitForFunction(()=>document.querySelector(".appearance-preview img")?.complete);
-        check(await page.locator(".appearance-preview img").evaluate(img=>{const a=img.getBoundingClientRect(),b=img.parentElement.getBoundingClientRect();return a.width<=b.width&&a.height<=b.height&&img.naturalWidth>0;}),"appearance: contained raster "+width+"x"+height);
+      for (const [width, height] of [
+        [128, 32],
+        [32, 128],
+        [64, 64],
+      ]) {
+        const data = await page.evaluate(
+          ([w, h]) => {
+            const c = document.createElement("canvas");
+            c.width = w;
+            c.height = h;
+            const ctx = c.getContext("2d");
+            ctx.fillStyle = "#9875b5";
+            ctx.fillRect(0, 0, w, h);
+            return c.toDataURL("image/png").split(",")[1];
+          },
+          [width, height],
+        );
+        await page.locator('input[type="file"]').setInputFiles({
+          name: "synthetic.png",
+          mimeType: "image/png",
+          buffer: Buffer.from(data, "base64"),
+        });
+        await page.waitForFunction(
+          () => document.querySelector(".appearance-preview img")?.complete,
+        );
+        check(
+          await page.locator(".appearance-preview img").evaluate((img) => {
+            const a = img.getBoundingClientRect(),
+              b = img.parentElement.getBoundingClientRect();
+            return (
+              a.width <= b.width && a.height <= b.height && img.naturalWidth > 0
+            );
+          }),
+          "appearance: contained raster " + width + "x" + height,
+        );
       }
       await page.getByRole("button", { name: "Cancel", exact: true }).click();
 
@@ -315,6 +345,10 @@ try {
         (await page.locator("dialog[open]").count()) === 0,
         "palette: Escape dismisses nested picker",
       );
+      check(
+        await page.locator("#query").isVisible(),
+        "palette: nested Escape preserves palette host",
+      );
     }
 
     if (pageName === "palette") {
@@ -381,6 +415,23 @@ try {
     }
     await context.close();
   }
+  const settings = await browser.newPage();
+  await settings.goto(origin + "/options.html");
+  await settings.locator("select").nth(1).waitFor();
+  await settings.evaluate(() =>
+    window.fixture.setPrefs({ expanded: ["design"], savedCollapsed: true }),
+  );
+  await settings.locator("select").nth(1).selectOption("dark");
+  const currentPreferences = await settings.evaluate(
+    async () => (await chrome.storage.local.get("preferences")).preferences,
+  );
+  check(
+    currentPreferences.theme === "dark" &&
+      currentPreferences.expanded.includes("design") &&
+      currentPreferences.savedCollapsed,
+    "settings: theme write preserves newer sidebar preferences",
+  );
+  await settings.close();
   check(errors.length === 0, "rendered pages: no uncaught errors");
   check(
     requests.length === 0,
