@@ -1,6 +1,6 @@
 # Acceptance matrix
 
-2026-10-28: **9 pass, 15 incomplete/blocked**. Passes are A02–A07, A12, A13 and A23. Native observations use signed-out **Arcify QA Temporary** in running Google Chrome 155.0.8059.85. Automated results are supporting evidence, not substitutes for native checks. See [native report](NATIVE-QA.md) for steps, defects, captures and exact limitations. This is not release sign-off.
+2026-10-28: **10 pass, 14 incomplete/blocked**. Passes are A02–A07, A12, A13, A16 and A23. Native observations use signed-out **Arcify QA Temporary** in running Google Chrome 155.0.8059.85. Automated results are supporting evidence, not substitutes for native checks. See [native report](NATIVE-QA.md) for steps, defects, captures and exact limitations. This is not release sign-off.
 
 | ID | Status | Evidence / remaining verification |
 | --- | --- | --- |
@@ -18,9 +18,9 @@
 | A12 | Pass | Native select, close, pin, mute, reload and duplicate affected synthetic intended tabs; pin/unmute labels and tab count verified. |
 | A13 | Pass | Other window label observed; selection activated Example Domain and focused its owning QA window. |
 | A14 | Incomplete | 37 rendered checks cover ranking/prefixes/labels/IME/no-match/picker; native query/actions/picker exercised. Physical modifier/IME matrix pending. |
-| A15 | Incomplete | Browser fullscreen, visible panel, popup input and normal restoration observed. Multi-window restoration moved focus to another QA window; maximize/focus matrix unresolved. |
-| A16 | Incomplete | Synthetic webpage requestFullscreen and Escape tested, Chrome retained its panel; video-element fullscreen untested. |
-| A17 | Incomplete | Worker inactive was observed. Two cold shortcut attempts showed no visible transition before reload; post-reload toggles worked. Suspension and rapid-toggle gate remains unresolved. |
+| A15 | Incomplete | Browser fullscreen, visible panel, popup input and normal restoration observed. Fixed explicit originating-window focus; a second QA window retained focus on entry and restore. Native zoom/restore was exercised, but exact maximized geometry comparison remains pending. |
+| A16 | Pass | Synthetic webpage and local video-element fullscreen tested. Video hid address/tab bars; popup opened with focused input, first Escape dismissed popup and second exited video fullscreen. Chrome retained its own restore infobar. |
+| A17 | Incomplete | Cold toggle defect fixed: avoid clearing lifecycle state on port disconnect and preserve the synchronous open gesture. First shortcut after observed inactive worker closed the panel; six rapid toggles ended closed. Cold association retention and remaining lifecycle permutations are pending. |
 | A18 | Blocked | Full process restart would close production windows because safe QA profile shares the running Chrome process. No quit attempted. Mock startup identity clearing/exact reconstruction passes. |
 | A19 | Incomplete | Native light/dark, left/right, folder/menu states inspected; synthetic narrow/raster containment and live appearance pass. Full native 200%/reduced-motion/keyboard matrix pending. |
 | A20 | Incomplete | Page-scoped Offline DevTools setting allowed folder interaction. Whole-profile offline listing/search/switching matrix not completed. |

@@ -56,13 +56,8 @@ chrome.runtime.onConnect.addListener((port) => {
     session.panels[w] = true;
     return save();
   });
-  port.onDisconnect.addListener(() => {
-    panels.delete(w);
-    void ready.then(() => {
-      session.panels[w] = false;
-      return save();
-    });
-  });
+  // Port disconnect also occurs on worker suspension, not only panel closure.
+  // Only Chrome's onClosed event may persist a closed lifecycle state.
 });
 chrome.sidePanel.onOpened.addListener(({ windowId }) => {
   panels.add(windowId);
@@ -78,13 +73,51 @@ chrome.sidePanel.onClosed.addListener(({ windowId }) => {
     return save();
   });
 });
+// Start the context snapshot before synchronously reserving the open gesture.
+// Chrome rejects open() after even one awaited browser call. Closing needs no
+// gesture; if the pre-action panel existed, finish this toggle by closing it.
+const panelOperations = new Map<
+  number,
+  { count: number; promise: Promise<void> }
+>();
+function panelAction(windowId: number, action: string): Promise<void> {
+  if (action === "show-sidebar") return chrome.sidePanel.open({ windowId });
+  if (action === "hide-sidebar") return chrome.sidePanel.close({ windowId });
+  const existing = panelOperations.get(windowId);
+  if (existing) {
+    existing.count++;
+    return existing.promise;
+  }
+  const before = Promise.all([
+    chrome.runtime.getContexts({
+      contextTypes: [chrome.runtime.ContextType.SIDE_PANEL],
+    }),
+    chrome.storage.session.get("session"),
+  ]);
+  const opening = chrome.sidePanel.open({ windowId });
+  const operation = { count: 1, promise: Promise.resolve() };
+  operation.promise = Promise.all([before, opening])
+    .then(async ([[contexts, stored]]) => {
+      const wasOpen =
+        readSession(stored.session).panels[windowId] === true &&
+        contexts.length > 0;
+      const shouldOpen = wasOpen !== (operation.count % 2 === 1);
+      if (!shouldOpen) await chrome.sidePanel.close({ windowId });
+    })
+    .finally(() => {
+      panelOperations.delete(windowId);
+    });
+  panelOperations.set(windowId, operation);
+  return operation.promise;
+}
 chrome.commands.onCommand.addListener((command, tab) => {
   if (command === "toggle-sidebar" && tab?.windowId !== undefined) {
-    const w = tab.windowId;
-    const action = panels.has(w)
-      ? chrome.sidePanel.close({ windowId: w })
-      : chrome.sidePanel.open({ windowId: w });
-    void action.catch(() => {});
+    void panelAction(tab.windowId, command).catch((error: unknown) => {
+      console.error(
+        "Sidebar command failed",
+        error instanceof Error ? error.message : "Unknown error",
+      );
+    });
   }
 });
 chrome.tabs.onActivated.addListener(({ tabId }) => {
@@ -294,11 +327,12 @@ async function run(m: Message): Promise<unknown> {
       if (win.state === "fullscreen")
         return chrome.windows.update(w, {
           state: session.fullscreen[w] ?? "normal",
+          focused: true,
         });
       session.fullscreen[w] =
         win.state === "maximized" ? "maximized" : "normal";
       await save();
-      return chrome.windows.update(w, { state: "fullscreen" });
+      return chrome.windows.update(w, { state: "fullscreen", focused: true });
     }
     case "settings":
       return chrome.runtime.openOptionsPage();
@@ -427,12 +461,7 @@ chrome.runtime.onMessage.addListener((m: Message, sender, reply) => {
       reply({ ok: false, error: "No originating window." });
       return false;
     }
-    const close =
-      m.action === "hide-sidebar" ||
-      (m.action === "toggle-sidebar" && panels.has(m.windowId));
-    const result = close
-      ? chrome.sidePanel.close({ windowId: m.windowId })
-      : chrome.sidePanel.open({ windowId: m.windowId });
+    const result = panelAction(m.windowId, m.action);
     void result.then(
       () => reply({ ok: true }),
       (e) => reply({ ok: false, error: String(e.message) }),

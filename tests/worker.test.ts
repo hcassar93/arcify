@@ -37,6 +37,9 @@ const area = (data: Record<string, unknown>) => ({
 });
 let missingDownload = false;
 const revealed: number[] = [];
+let livePanel = true;
+const panelCalls: string[] = [];
+const windowUpdates: Record<string, unknown>[] = [];
 const chromeMock = {
   downloads: {
     search: async () => [
@@ -46,6 +49,9 @@ const chromeMock = {
   },
   runtime: {
     id: "ox-test",
+    ContextType: { SIDE_PANEL: "SIDE_PANEL" },
+    getContexts: async () =>
+      livePanel ? [{ windowId: -1, documentId: "panel-document" }] : [],
     onConnect: event(),
     onStartup: event(),
     onMessage: {
@@ -59,13 +65,26 @@ const chromeMock = {
   sidePanel: {
     onOpened: event(),
     onClosed: event(),
-    open: async () => {},
-    close: async () => {},
+    open: async () => {
+      livePanel = true;
+      session.session = { ...(session.session as object), panels: { 1: true } };
+      panelCalls.push("open");
+    },
+    close: async () => {
+      livePanel = false;
+      session.session = {
+        ...(session.session as object),
+        panels: { 1: false },
+      };
+      panelCalls.push("close");
+    },
   },
   commands: { onCommand: event() },
   windows: {
     get: async (id: number) => ({ id, type: "normal", state: "normal" }),
-    update: async () => {},
+    update: async (_id: number, value: Record<string, unknown>) => {
+      windowUpdates.push(value);
+    },
   },
   bookmarks: {
     getTree: async () => structuredClone(bookmarks),
@@ -235,4 +254,22 @@ test("worker local appearance leaves native title unchanged and resets cleanly",
         .customizations,
     false,
   );
+});
+
+test("worker toggles live panel despite stale session and serializes rapid requests", async () => {
+  livePanel = true;
+  session.session = { ...(session.session as object), panels: { 1: true } };
+  panelCalls.length = 0;
+  assert.equal((await send("toggle-sidebar", { windowId: 1 })).ok, true);
+  assert.deepEqual(panelCalls, ["open", "close"]);
+  await Promise.all([
+    send("toggle-sidebar", { windowId: 1 }),
+    send("toggle-sidebar", { windowId: 1 }),
+  ]);
+  assert.deepEqual(panelCalls, ["open", "close", "open", "close"]);
+  assert.equal(livePanel, false);
+});
+test("fullscreen explicitly focuses its originating window", async () => {
+  assert.equal((await send("fullscreen", { windowId: 1 })).ok, true);
+  assert.equal(windowUpdates.at(-1)?.focused, true);
 });

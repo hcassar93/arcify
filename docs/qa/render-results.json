@@ -5,8 +5,8 @@
     "samples": 100,
     "bookmarks": 5000,
     "tabs": 500,
-    "p95Ms": 4.399999618530273,
-    "maxMs": 5.199999809265137,
+    "p95Ms": 4.699999809265137,
+    "maxMs": 5.699999809265137,
     "scope": "Synthetic headless input dispatch through synchronous results DOM and forced layout; excludes native popup host and screen presentation."
   },
   "checks": 37,
