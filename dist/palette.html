@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Ox — Search or jump</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="palette" data-page="palette">
+    <input
+      id="query"
+      role="combobox"
+      aria-label="Search tabs, bookmarks and commands"
+      aria-controls="results"
+      aria-expanded="true"
+      aria-autocomplete="list"
+      autocomplete="off"
+      placeholder="Search or jump…"
+      autofocus
+    />
+    <div
+      id="results"
+      class="results"
+      role="listbox"
+      aria-label="Local results"
+    ></div>
+    <div class="palette-footer">↑ ↓ to choose · Enter to go · Esc to close</div>
+    <script type="module" src="palette.js"></script>
+  </body>
+</html>

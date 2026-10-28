@@ -1,0 +1,29 @@
+{
+  "name": "ox-chrome",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests scripts",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "benchmark": "node --import tsx tests/benchmark.ts",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build && npm run audit:build && npm run benchmark",
+    "preview": "node scripts/preview.mjs",
+    "format": "prettier --write src tests scripts public *.json *.js",
+    "audit:build": "node scripts/audit-build.mjs"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "2.6.2",
+    "@types/chrome": "0.1.24",
+    "@types/node": "24.10.0",
+    "esbuild": "0.25.12",
+    "eslint": "9.39.1",
+    "prettier": "3.6.2",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.46.4"
+  }
+}

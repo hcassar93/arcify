@@ -1,0 +1,49 @@
+# Ox
+
+A local-first Chrome sidebar and command palette, inspired by Arc's hierarchy. MIT licensed; no backend, account, telemetry, remote assets, or runtime dependencies.
+
+**Development preview — native Chrome acceptance is incomplete.** The code builds and automated checks pass, but the required real Chrome installation, shortcuts, popup focus, fullscreen, network traces and visual regression have not been verified. Do not treat this as a completed release. See [QA report](docs/QA.md) and [acceptance matrix](docs/ACCEPTANCE.md).
+
+## Implemented UI previews
+
+These images render the actual bundled UI with synthetic Chrome API fixtures in headless installed Chrome. They are not screenshots of an installed extension and do not prove native behavior.
+
+[Sidebar preview](docs/qa/sidebar-preview.png) · [Command palette preview](docs/qa/palette-preview.png)
+
+## Build and load
+
+Tested development environment: Node **26.8.1**, npm **11.19.0**, macOS **26.6.2** (Apple M1 Pro). Minimum Chrome **142**; installed Chrome on the test machine is **156.0.8078.48**. Windows and Linux are untested.
+
+```sh
+npm ci --ignore-scripts
+npm run check
+```
+
+Dependencies may require internet access at build time. `dist/` is committed and loadable without building. There are no runtime packages or requests. `npm run build` reproducibly packages the four entry points and local assets; `npm test` runs unit/security and mock-worker integration tests; `npm run benchmark` runs the synthetic search benchmark.
+
+1. Use a disposable Chrome profile first, with synthetic bookmarks only.
+2. Open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select this repository's **dist** directory. Enterprise policy may require administrator approval; do not bypass it.
+3. Open Ox from the toolbar. Use **Settings** to choose a bookmark folder. The default uses Chrome's `folderType` data, not a translated title or hardcoded ID.
+4. After rebuilding, click **Reload** on the Ox card in `chrome://extensions`, then reopen the panel and popup.
+
+Suggested shortcuts: **Command+Shift+K** palette and **Command+Shift+Y** sidebar on macOS; **Control+Shift+K/Y** elsewhere. Chrome decides whether these are assigned. Ox Settings shows `commands.getAll()` results or **Not assigned**. Configure them at `chrome://extensions/shortcuts`. Shortcut open/close delivery remains a native QA gate.
+
+Search supports `>` actions, `@` tabs and `#` bookmarks. Up/Down selects, Enter activates, and Command+Enter/Control+Enter deliberately opens a new tab. Search never goes to a web search service. An explicit HTTP(S) URL or recognisable domain offers Open URL. Context menus distinguish Close live tab, Remove from favourites and Delete bookmark. Bookmark writes require an explicit user action; installation does not edit bookmarks.
+
+## Permissions and privacy
+
+Exactly `tabs`, `bookmarks`, `storage`, `sidePanel`. No host permissions or content scripts. `tabs` exposes titles and URLs, and Chrome may describe it as reading browsing history; it does not grant DOM access. `bookmarks` grants reading and writing together—Chrome has no read-only version. Preferences use `storage.local`, associations use `storage.session`; never `storage.sync`. Chrome itself may sync native bookmarks under existing browser settings.
+
+All resources are packaged. The explicit CSP disallows connections and remote code. Permission restrictions are not a mathematical exfiltration guarantee: navigating to a user-selected URL can transmit data to that destination. Ox never attaches context to destinations. See [PRIVACY](PRIVACY.md) and [SECURITY](SECURITY.md).
+
+## Differences from Arc and known limitations
+
+Chrome owns the side-panel header, width and placement. Choose left/right under Chrome Settings → Appearance. The palette is a native toolbar popup, not a centred webpage overlay. Ox does not hide native tabs, inject into websites, archive tabs, implement Spaces, or provide web search. Normal browser fullscreen and website fullscreen are different; neither has been accepted on this test environment. Do not rely on fullscreen or shortcut toggle behavior until the manual gates pass.
+
+Implementation gaps still requiring work/verification: full incremental browser-store reconciliation (current snapshots rebuild on browser events, never per keystroke); bounded rendering of very large saved trees; complete keyboard ordering equivalents for bookmark moves; exact same-folder drag indices; full two-pass native visual QA; end-to-end rendered performance and runtime network inspection. Managed-node failures are reported, but all policy edge cases need real-profile testing. The options page and some action flows need further accessibility review.
+
+Reset preferences preserves bookmarks. Uninstall removes extension storage but does not undo user-confirmed native bookmark edits. No Chrome Web Store publication or auto-updater is configured.
+
+## Contributing
+
+See [CONTRIBUTING](CONTRIBUTING.md), [architecture](docs/ARCHITECTURE.md), and the preserved [complete implementation brief](docs/IMPLEMENTATION-BRIEF.md). Use synthetic data in issues and evidence.

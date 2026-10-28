@@ -1,0 +1,5 @@
+node_modules/
+.ui-ux-score-loop/
+.DS_Store
+*.log
+docs/qa/preview/

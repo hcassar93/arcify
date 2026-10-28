@@ -1,0 +1,97 @@
+
+> ox-chrome@0.1.0 check
+> npm run typecheck && npm run lint && npm test && npm run build && npm run audit:build && npm run benchmark
+
+
+> ox-chrome@0.1.0 typecheck
+> tsc --noEmit
+
+
+> ox-chrome@0.1.0 lint
+> eslint src tests scripts
+
+
+> ox-chrome@0.1.0 test
+> node --import tsx --test tests/*.test.ts
+
+(node:98711) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✔ reject destination javascript:alert(1) (0.724875ms)
+✔ reject destination data:text/html,test (0.060584ms)
+✔ reject destination file:///tmp/a (0.047417ms)
+✔ reject destination chrome-extension://abc/a (0.361375ms)
+✔ reject destination ftp://example.test (0.06375ms)
+✔ reject destination https://user:pass@example.test (0.049416ms)
+✔ reject destination https://user@example.test (0.043708ms)
+✔ reject destination custom:abc (0.037708ms)
+✔ only named internal actions allowed (0.103458ms)
+✔ canonical host and scheme but preserve meaningful URL components (0.125667ms)
+✔ explicit URLs and domain entry support ports and localhost (0.537166ms)
+✔ malformed optional preferences recover safely (0.483709ms)
+✔ favourites limit is 12 (0.070166ms)
+✔ associations survive navigation within original window (0.574833ms)
+✔ exact matching prefers active, then MRU, then native order (0.15375ms)
+✔ duplicate ownership favours favourite; extra live duplicate stays ordinary (0.13825ms)
+✔ closed and moved tab associations are pruned without removing bookmarks (0.154458ms)
+✔ rapid activation is single-flight and remembers existing exact match (0.210042ms)
+✔ adapter failure does not write false association and retry works (0.2565ms)
+✔ existing exact match is associated before later redirect (0.084167ms)
+✔ tree movement rejects cycles and managed targets (0.085541ms)
+✔ native tree order and descendant counts are preserved (0.100667ms)
+✔ ranking tiers outrank window recency (1.23425ms)
+✔ unicode matching, prefixes, duplicate result and no match handling (0.722875ms)
+✔ empty query limits recent tabs and excludes current (0.21225ms)
+✔ incremental search changes and bounded results (8.117167ms)
+(node:98712) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✔ manifest has exactly the permission contract (0.722458ms)
+✔ CSP prevents extension remote resource and connection loads (0.087042ms)
+✔ source has no network clients, HTML injection, remote icons or sync storage (0.550959ms)
+✔ all URL navigation writes are centralized (0.258458ms)
+✔ production resources are local and no inline scripts (0.296583ms)
+✔ malicious display titles use textContent primitive (0.245209ms)
+(node:98713) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✔ worker startup is read-only for bookmarks and tabs (0.963917ms)
+✔ worker activation serializes concurrent clicks, persists redirects, reset is explicit (0.650209ms)
+✔ worker deliberate fresh activation creates exactly one additional tab (0.102125ms)
+✔ worker denied edit preserves bookmark and sends recoverable error (0.247208ms)
+✔ worker rejects bookmarklets before browser mutation (0.129166ms)
+✔ worker handles tab disappearing between search and execution (0.103583ms)
+✔ worker save only mutates after explicit message (0.114167ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 150.266875
+
+> ox-chrome@0.1.0 build
+> node scripts/build.mjs
+
+Packaged local-only extension in dist/
+
+> ox-chrome@0.1.0 audit:build
+> node scripts/audit-build.mjs
+
+Built permission/resource/network-client audit passed. Runtime traffic inspection is a separate native Chrome gate.
+
+> ox-chrome@0.1.0 benchmark
+> node --import tsx tests/benchmark.ts
+
+{
+  "machine": "Apple M1 Pro",
+  "platform": "darwin",
+  "arch": "arm64",
+  "node": "v26.8.1",
+  "bookmarks": 5000,
+  "tabs": 500,
+  "samples": 500,
+  "p95Ms": 2.554708000000005,
+  "maxMs": 3.315750000000037,
+  "scope": "Search computation only; popup rendering and installed Chrome latency remain unmeasured."
+}
+(node:98850) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)

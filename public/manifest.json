@@ -1,0 +1,53 @@
+{
+  "manifest_version": 3,
+  "name": "Ox",
+  "version": "0.1.0",
+  "minimum_chrome_version": "142",
+  "permissions": ["tabs", "bookmarks", "storage", "sidePanel"],
+  "incognito": "not_allowed",
+  "action": {
+    "default_popup": "palette.html",
+    "default_title": "Ox \u2014 Search or jump",
+    "default_icon": {
+      "16": "icons/ox-16.png",
+      "32": "icons/ox-32.png",
+      "48": "icons/ox-48.png",
+      "128": "icons/ox-128.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "sidebar.html"
+  },
+  "background": {
+    "service_worker": "worker.js",
+    "type": "module"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+K",
+        "mac": "Command+Shift+K"
+      }
+    },
+    "toggle-sidebar": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
+      },
+      "description": "Toggle Ox sidebar"
+    }
+  },
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "16": "icons/ox-16.png",
+    "32": "icons/ox-32.png",
+    "48": "icons/ox-48.png",
+    "128": "icons/ox-128.png"
+  }
+}
