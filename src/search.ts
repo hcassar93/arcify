@@ -1,5 +1,11 @@
 import { enteredURL } from "./navigation";
-export type Kind = "tab" | "bookmark" | "folder" | "command" | "url";
+export type Kind =
+  | "download"
+  | "tab"
+  | "bookmark"
+  | "folder"
+  | "command"
+  | "url";
 export interface Entry {
   id: string;
   kind: Kind;

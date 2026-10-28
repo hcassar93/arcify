@@ -3,7 +3,14 @@
   "name": "arcify",
   "version": "0.1.0",
   "minimum_chrome_version": "142",
-  "permissions": ["tabs", "bookmarks", "storage", "sidePanel", "favicon"],
+  "permissions": [
+    "tabs",
+    "bookmarks",
+    "storage",
+    "sidePanel",
+    "favicon",
+    "downloads"
+  ],
   "incognito": "not_allowed",
   "action": {
     "default_popup": "palette.html",

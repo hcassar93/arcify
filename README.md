@@ -32,7 +32,7 @@ Search supports `>` actions, `@` tabs and `#` bookmarks. Up/Down selects, Enter 
 
 ## Permissions and privacy
 
-Exactly `tabs`, `bookmarks`, `storage`, `sidePanel`, `favicon`. No host permissions or content scripts. `tabs` exposes titles and URLs, and Chrome may describe it as reading browsing history; it does not grant DOM access. `bookmarks` grants reading and writing together—Chrome has no read-only version. Preferences use `storage.local`, associations use `storage.session`; never `storage.sync`. Chrome itself may sync native bookmarks under existing browser settings.
+Exactly `tabs`, `bookmarks`, `storage`, `sidePanel`, `favicon`, `downloads`. No host permissions or content scripts. `tabs` exposes titles and URLs, and Chrome may describe it as reading browsing history; it does not grant DOM access. `bookmarks` grants reading and writing together—Chrome has no read-only version. Preferences use `storage.local`, associations use `storage.session`; never `storage.sync`. Chrome itself may sync native bookmarks under existing browser settings.
 
 All resources are packaged. The explicit CSP disallows connections and remote code. Permission restrictions are not a mathematical exfiltration guarantee: navigating to a user-selected URL can transmit data to that destination. arcify never attaches context to destinations. See [PRIVACY](PRIVACY.md) and [SECURITY](SECURITY.md).
 
@@ -51,3 +51,5 @@ Reset preferences preserves bookmarks. Uninstall removes extension storage but d
 ## Contributing
 
 See [CONTRIBUTING](CONTRIBUTING.md), [architecture](docs/ARCHITECTURE.md), and the preserved [complete implementation brief](docs/IMPLEMENTATION-BRIEF.md). Use synthetic data in issues and evidence.
+
+Downloads uses the explicitly approved downloads permission. The sidebar and palette show at most 50 recent records, with filenames, status and progress held in memory only. No download contents, full paths or source URLs are stored or transmitted. Reveal is user initiated and does not execute the file; Manage opens Chrome's downloads page. No downloads.open, automatic downloads, file deletion, history erasure or external services. Updates use events plus a one-second refresh while an active transfer is present in an open UI. Chrome's existence flag can lag; Reveal re-queries the record. Official API contract: https://developer.chrome.com/docs/extensions/reference/api/downloads .

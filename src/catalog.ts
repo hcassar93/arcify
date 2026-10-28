@@ -93,7 +93,25 @@ export class SearchCatalog {
         kind: b.url ? "bookmark" : "folder",
         title: s.prefs.customizations?.[id]?.name || b.title || "Untitled",
         aliases: b.title,
-        detail: [b.path, b.url].filter(Boolean).join(" · "),
+        detail: [
+          (() => {
+            const names: string[] = [];
+            let parent = all.get(b.parentId!);
+            const seen = new Set<string>();
+            while (parent && !seen.has(parent.id)) {
+              seen.add(parent.id);
+              if (parent.title)
+                names.unshift(
+                  s.prefs.customizations?.[parent.id]?.name || parent.title,
+                );
+              parent = all.get(parent.parentId!);
+            }
+            return names.join(" / ");
+          })(),
+          b.url,
+        ]
+          .filter(Boolean)
+          .join(" · "),
         url: b.url,
         tabId: tab?.id,
         open: !!tab,

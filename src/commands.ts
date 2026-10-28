@@ -1,4 +1,5 @@
 export type CommandId =
+  | "downloads"
   | "new-tab"
   | "toggle-sidebar"
   | "show-sidebar"
@@ -21,6 +22,11 @@ export interface Command {
   needsTab?: boolean;
 }
 export const commands: Command[] = [
+  {
+    id: "downloads",
+    label: "Manage downloads in Chrome",
+    aliases: "downloads files recent",
+  },
   { id: "new-tab", label: "New blank tab", aliases: "new tab create" },
   { id: "toggle-sidebar", label: "Toggle sidebar", aliases: "panel show hide" },
   { id: "show-sidebar", label: "Show sidebar", aliases: "panel open" },

@@ -12,8 +12,10 @@ Vanilla TypeScript with esbuild produces four packaged modules: sidebar, palette
 - `ui.ts`: text-based elements, error handling, accessible dialogs and menus, shared command routing.
 - `sidebar.ts`, `palette.ts`, `options.ts`: surfaces with shared tokens in public/style.css.
 
-Browser events refresh snapshots; search does not rebuild the bookmark tree for each keystroke. A future refinement should incrementally update stores on individual browser events and virtualize very large saved trees. Worker operations reconcile API failures and do not optimistically modify native bookmark state. Session associations are validated against tab window IDs; full startup clears session identities. Exact URL matching reconstructs presentation on the next snapshot. Navigated associations cannot be reconstructed after a full browser restart without evidence.
+Browser events refresh snapshots; search does not rebuild the bookmark tree for each keystroke. The stores update individual browser events, the search catalog invalidates affected entries, and saved/open lists are paginated at 80 rows. Worker operations reconcile API failures and do not optimistically modify native bookmark state. Session associations are validated against tab window IDs; full startup clears session identities. Exact URL matching reconstructs presentation on the next snapshot. Navigated associations cannot be reconstructed after a full browser restart without evidence.
 
 The popup uses `_execute_action` and a local keyboard dismissal handler. Its physical shortcut delivery remains unverified. Panel lifecycle combines mounted ports, Chrome opened/closed events, and persisted session state. Rapid command delivery, suspension and native focus require actual Chrome testing.
 
 The preview harness in scripts/preview.mjs supplies synthetic Chrome APIs to the actual bundled UI. It is generated outside dist, never included in the extension, and is not an installed-extension integration test.
+
+appearance.ts validates local overrides and normalizes raster images. downloads.ts maintains a capped in-memory metadata projection; downloads-ui and palette share statuses and explicit reveal/manage semantics.

@@ -11,7 +11,7 @@
       <input
         id="query"
         role="combobox"
-        aria-label="Search tabs, bookmarks and commands"
+        aria-label="Search tabs, bookmarks, downloads and commands"
         aria-controls="results"
         aria-expanded="true"
         aria-autocomplete="list"
@@ -28,7 +28,8 @@
       aria-label="Local results"
     ></div>
     <div class="palette-footer">
-      <span>↑ ↓ Navigate</span><span>↵ Open</span><span>⌘ ↵ New tab</span>
+      <span>↑ ↓ Navigate</span><span id="enter-hint">↵ Open</span
+      ><span id="fresh-hint">⌘ ↵ New tab</span>
     </div>
     <script type="module" src="palette.js"></script>
   </body>

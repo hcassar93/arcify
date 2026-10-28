@@ -1,5 +1,145 @@
+// src/downloads.ts
+var DOWNLOAD_LIMIT = 50;
+function summarizeDownload(d) {
+  return {
+    id: d.id,
+    name: d.filename.split(/[\\/]/).at(-1) || "Unnamed download",
+    state: d.state,
+    paused: d.paused,
+    exists: d.exists,
+    received: Math.max(0, d.bytesReceived),
+    total: d.totalBytes,
+    start: d.startTime,
+    danger: d.danger
+  };
+}
+function downloadStatus(d) {
+  if (d.state === "complete") return d.exists ? "Complete" : "File missing";
+  if (d.state === "interrupted") return "Interrupted \xB7 manage in Chrome";
+  if (d.paused) return "Paused";
+  return d.total > 0 ? Math.min(100, Math.round(d.received / d.total * 100)) + "% downloaded" : "Downloading\u2026";
+}
+function canReveal(d) {
+  return d.state === "complete" && d.exists;
+}
+var DownloadStore = class {
+  constructor(api) {
+    this.api = api;
+  }
+  items = [];
+  error = "";
+  listeners = /* @__PURE__ */ new Set();
+  timer;
+  running = false;
+  again = false;
+  async refresh() {
+    if (this.running) {
+      this.again = true;
+      return;
+    }
+    this.running = true;
+    try {
+      this.items = (await this.api.search({
+        limit: DOWNLOAD_LIMIT,
+        orderBy: ["-startTime"]
+      })).filter((d) => !d.incognito).slice(0, DOWNLOAD_LIMIT).map(summarizeDownload);
+      this.error = "";
+    } catch {
+      this.error = "Downloads are unavailable. Try again.";
+    } finally {
+      this.running = false;
+      this.listeners.forEach((fn) => fn());
+      if (this.again) {
+        this.again = false;
+        void this.refresh();
+      }
+    }
+  }
+  watch(fn) {
+    this.listeners.add(fn);
+    const changed = () => {
+      clearTimeout(this.timer);
+      this.timer = setTimeout(() => void this.refresh(), 100);
+    };
+    this.api.onCreated.addListener(changed);
+    this.api.onChanged.addListener(changed);
+    this.api.onErased.addListener(changed);
+    const interval = setInterval(() => {
+      if (this.items.some((d) => d.state === "in_progress" && !d.paused))
+        changed();
+    }, 1e3);
+    window.addEventListener(
+      "pagehide",
+      () => {
+        clearInterval(interval);
+        clearTimeout(this.timer);
+        this.api.onCreated.removeListener(changed);
+        this.api.onChanged.removeListener(changed);
+        this.api.onErased.removeListener(changed);
+      },
+      { once: true }
+    );
+    void this.refresh();
+  }
+};
+
+// src/appearance.ts
+function validateAppearance(raw) {
+  if (!raw || typeof raw !== "object") return {};
+  const v = raw, out = {};
+  if (v.name !== void 0) {
+    if (typeof v.name !== "string" || v.name.length > 120)
+      throw new Error("Display names must be at most 120 characters.");
+    if (v.name.trim()) out.name = v.name.trim();
+  }
+  if (v.emoji !== void 0) {
+    if (typeof v.emoji !== "string" || v.emoji.length > 16)
+      throw new Error("Choose a short icon or emoji.");
+    if (v.emoji.trim()) out.emoji = v.emoji.trim();
+  }
+  if (v.image !== void 0) {
+    if (typeof v.image !== "string" || v.image.length > 1e5 || !/^data:image\/png;base64,iVBORw0KGgo[A-Za-z0-9+/=]+$/.test(v.image))
+      throw new Error("Choose a validated PNG image.");
+    out.image = v.image;
+  }
+  return out;
+}
+function readAppearances(raw) {
+  const result = {};
+  if (!raw || typeof raw !== "object") return result;
+  for (const [id, value] of Object.entries(raw)) {
+    if (["__proto__", "constructor", "prototype"].includes(id)) continue;
+    try {
+      result[id] = validateAppearance(value);
+    } catch {
+    }
+  }
+  return JSON.stringify(result).length <= 2e6 ? result : {};
+}
+async function localImage(file) {
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 2e6)
+    throw new Error("Choose a PNG, JPEG or WebP smaller than 2 MB.");
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const valid = file.type === "image/png" ? bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71 : file.type === "image/jpeg" ? bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 : String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
+  if (!valid) throw new Error("The file contents do not match its image type.");
+  const bitmap = await createImageBitmap(file);
+  try {
+    if (!bitmap.width || !bitmap.height || bitmap.width > 4096 || bitmap.height > 4096)
+      throw new Error("Images must be no larger than 4096 \xD7 4096.");
+    const canvas = document.createElement("canvas");
+    const scale = Math.min(1, 128 / Math.max(bitmap.width, bitmap.height));
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return validateAppearance({ image: canvas.toDataURL("image/png") }).image;
+  } finally {
+    bitmap.close();
+  }
+}
+
 // src/icons.ts
 var paths = {
+  download: "M8 1v9 M4 6l4 4 4-4 M2 11v3h12v-3",
   search: "m14 14-4-4 M11.5 6.5a5 5 0 1 1-10 0 5 5 0 0 1 10 0",
   folder: "M1 3h5l2 2h7v9H1Z",
   chevron: "m6 4 4 4-4 4",
@@ -117,100 +257,6 @@ function siteIcon(title, url, override, image) {
     box.append(img);
   } else packaged();
   return box;
-}
-
-// src/tree-view.ts
-var PAGE_SIZE = 80;
-function treeRows(children, expanded, favourites, active) {
-  const rows = [];
-  const activeChild = (nodes) => {
-    for (const n of nodes) {
-      if (n.url && active.has(n.id) && !favourites.has(n.id)) return n;
-      const child = activeChild(n.children ?? []);
-      if (child) return child;
-    }
-    return void 0;
-  };
-  const visit = (nodes, depth) => {
-    for (const node of nodes) {
-      if (node.url && favourites.has(node.id)) continue;
-      rows.push({ node, depth, contextual: false });
-      if (!node.url) {
-        if (expanded.has(node.id)) visit(node.children ?? [], depth + 1);
-        else {
-          const child = activeChild(node.children ?? []);
-          if (child)
-            rows.push({ node: child, depth: depth + 1, contextual: true });
-        }
-      }
-    }
-  };
-  visit(children, 0);
-  return rows;
-}
-function pageRange(length, page, size = PAGE_SIZE) {
-  const pages = Math.max(1, Math.ceil(length / size));
-  const safe = Math.max(0, Math.min(page, pages - 1));
-  return {
-    page: safe,
-    start: safe * size,
-    end: Math.min(length, (safe + 1) * size),
-    pages
-  };
-}
-
-// src/appearance.ts
-function validateAppearance(raw) {
-  if (!raw || typeof raw !== "object") return {};
-  const v = raw, out = {};
-  if (v.name !== void 0) {
-    if (typeof v.name !== "string" || v.name.length > 120)
-      throw new Error("Display names must be at most 120 characters.");
-    if (v.name.trim()) out.name = v.name.trim();
-  }
-  if (v.emoji !== void 0) {
-    if (typeof v.emoji !== "string" || v.emoji.length > 16)
-      throw new Error("Choose a short icon or emoji.");
-    if (v.emoji.trim()) out.emoji = v.emoji.trim();
-  }
-  if (v.image !== void 0) {
-    if (typeof v.image !== "string" || v.image.length > 1e5 || !/^data:image\/png;base64,iVBORw0KGgo[A-Za-z0-9+/=]+$/.test(v.image))
-      throw new Error("Choose a validated PNG image.");
-    out.image = v.image;
-  }
-  return out;
-}
-function readAppearances(raw) {
-  const result = {};
-  if (!raw || typeof raw !== "object") return result;
-  for (const [id, value] of Object.entries(raw)) {
-    if (["__proto__", "constructor", "prototype"].includes(id)) continue;
-    try {
-      result[id] = validateAppearance(value);
-    } catch {
-    }
-  }
-  return JSON.stringify(result).length <= 2e6 ? result : {};
-}
-async function localImage(file) {
-  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 2e6)
-    throw new Error("Choose a PNG, JPEG or WebP smaller than 2 MB.");
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const valid = file.type === "image/png" ? bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71 : file.type === "image/jpeg" ? bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 : String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
-  if (!valid) throw new Error("The file contents do not match its image type.");
-  const bitmap = await createImageBitmap(file);
-  try {
-    if (!bitmap.width || !bitmap.height || bitmap.width > 4096 || bitmap.height > 4096)
-      throw new Error("Images must be no larger than 4096 \xD7 4096.");
-    const canvas = document.createElement("canvas");
-    const scale = Math.min(1, 128 / Math.max(bitmap.width, bitmap.height));
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-    canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    return validateAppearance({ image: canvas.toDataURL("image/png") }).image;
-  } finally {
-    bitmap.close();
-  }
 }
 
 // src/model.ts
@@ -622,49 +668,13 @@ async function request(action, args = {}) {
   return response.value;
 }
 
-// src/navigation.ts
-function canonical(value) {
-  try {
-    const u = new URL(value);
-    if (!["http:", "https:"].includes(u.protocol) || u.username || u.password)
-      return null;
-    return u.href;
-  } catch {
-    return null;
-  }
-}
-
-// src/resolver.ts
-function owners(bookmarks, favourites, windowId2, tabs, session2) {
-  const lookup = resolutionIndex(windowId2, tabs, session2);
-  const ordered = [
-    ...favourites.map((id) => bookmarks.find((b) => b.id === id)).filter((b) => !!b),
-    ...bookmarks.filter((b) => !favourites.includes(b.id))
-  ];
-  const result = /* @__PURE__ */ new Map();
-  for (const b of ordered) {
-    if (!b.url) continue;
-    const t = lookup(b);
-    if (t?.id !== void 0 && !result.has(t.id)) result.set(t.id, b.id);
-  }
-  return result;
-}
-function resolutionIndex(windowId2, tabs, session2) {
-  const current = tabs.filter((t) => t.windowId === windowId2), byId = new Map(current.map((t) => [t.id, t]));
-  const recency = new Map(session2.mru.map((id, index) => [id, index]));
-  const sorted = [...current].sort(
-    (a, b) => Number(b.active) - Number(a.active) || (recency.get(a.id) ?? 1e9) - (recency.get(b.id) ?? 1e9) || a.index - b.index
-  );
-  const byURL = /* @__PURE__ */ new Map();
-  for (const tab of sorted) {
-    const key = canonical(tab.url ?? "");
-    if (key && !byURL.has(key)) byURL.set(key, tab);
-  }
-  return (b) => byId.get(session2.associations[windowId2]?.[b.id]) ?? byURL.get(canonical(b.url ?? "") ?? "");
-}
-
 // src/commands.ts
 var commands = [
+  {
+    id: "downloads",
+    label: "Manage downloads in Chrome",
+    aliases: "downloads files recent"
+  },
   { id: "new-tab", label: "New blank tab", aliases: "new tab create" },
   { id: "toggle-sidebar", label: "Toggle sidebar", aliases: "panel show hide" },
   { id: "show-sidebar", label: "Show sidebar", aliases: "panel open" },
@@ -1160,8 +1170,154 @@ function appearanceEditor(s, bookmarkId, tabId) {
   name.focus();
 }
 
+// src/downloads-ui.ts
+function downloadsView(store, windowId2) {
+  const section = el("section", "", "downloads-view");
+  section.ariaLabel = "Recent downloads";
+  const heading = el("div", "", "download-heading");
+  heading.append(
+    el("h2", "Downloads"),
+    button("Manage in Chrome", () => request("downloads", { windowId: windowId2 }))
+  );
+  section.append(
+    heading,
+    el("p", "Your 50 most recent downloads \xB7 stays on this device", "hint")
+  );
+  if (store.error) {
+    const error = el("p", store.error, "error");
+    error.role = "alert";
+    section.append(
+      error,
+      button("Try again", () => store.refresh())
+    );
+  }
+  if (!store.items.length && !store.error)
+    section.append(
+      el("p", "No recent downloads", "empty"),
+      el("p", "Files you download in Chrome will appear here.", "hint")
+    );
+  for (const d of store.items) {
+    const row = el("article", "", "download-row"), copy = el("div", "", "download-copy");
+    const date = new Date(d.start);
+    const detail = downloadStatus(d) + (Number.isFinite(date.valueOf()) ? " \xB7 " + date.toLocaleDateString(void 0, { month: "short", day: "numeric" }) : "");
+    copy.append(
+      el("div", d.name, "row-label"),
+      el("div", detail, "result-detail")
+    );
+    if (d.state === "in_progress") {
+      const progress = el("progress");
+      progress.max = 100;
+      if (d.total > 0)
+        progress.value = Math.min(100, d.received / d.total * 100);
+      progress.ariaLabel = "Download progress for " + d.name;
+      copy.append(progress);
+    }
+    if (!["safe", "accepted", "allowlistedByPolicy", "deepScannedSafe"].includes(
+      d.danger
+    ))
+      copy.append(el("div", "Review safety status in Chrome", "hint"));
+    const reveal = button(
+      "Reveal",
+      () => request("reveal-download", { downloadId: d.id }),
+      "download-reveal"
+    );
+    reveal.dataset.key = "download-" + d.id;
+    reveal.disabled = !canReveal(d);
+    reveal.ariaLabel = "Reveal " + d.name + " in Finder or file manager";
+    row.append(icon("download"), copy, reveal);
+    section.append(row);
+  }
+  return section;
+}
+
+// src/tree-view.ts
+var PAGE_SIZE = 80;
+function treeRows(children, expanded, favourites, active) {
+  const rows = [];
+  const activeChild = (nodes) => {
+    for (const n of nodes) {
+      if (n.url && active.has(n.id) && !favourites.has(n.id)) return n;
+      const child = activeChild(n.children ?? []);
+      if (child) return child;
+    }
+    return void 0;
+  };
+  const visit = (nodes, depth) => {
+    for (const node of nodes) {
+      if (node.url && favourites.has(node.id)) continue;
+      rows.push({ node, depth, contextual: false });
+      if (!node.url) {
+        if (expanded.has(node.id)) visit(node.children ?? [], depth + 1);
+        else {
+          const child = activeChild(node.children ?? []);
+          if (child)
+            rows.push({ node: child, depth: depth + 1, contextual: true });
+        }
+      }
+    }
+  };
+  visit(children, 0);
+  return rows;
+}
+function pageRange(length, page, size = PAGE_SIZE) {
+  const pages = Math.max(1, Math.ceil(length / size));
+  const safe = Math.max(0, Math.min(page, pages - 1));
+  return {
+    page: safe,
+    start: safe * size,
+    end: Math.min(length, (safe + 1) * size),
+    pages
+  };
+}
+
+// src/navigation.ts
+function canonical(value) {
+  try {
+    const u = new URL(value);
+    if (!["http:", "https:"].includes(u.protocol) || u.username || u.password)
+      return null;
+    return u.href;
+  } catch {
+    return null;
+  }
+}
+
+// src/resolver.ts
+function owners(bookmarks, favourites, windowId2, tabs, session2) {
+  const lookup = resolutionIndex(windowId2, tabs, session2);
+  const ordered = [
+    ...favourites.map((id) => bookmarks.find((b) => b.id === id)).filter((b) => !!b),
+    ...bookmarks.filter((b) => !favourites.includes(b.id))
+  ];
+  const result = /* @__PURE__ */ new Map();
+  for (const b of ordered) {
+    if (!b.url) continue;
+    const t = lookup(b);
+    if (t?.id !== void 0 && !result.has(t.id)) result.set(t.id, b.id);
+  }
+  return result;
+}
+function resolutionIndex(windowId2, tabs, session2) {
+  const current = tabs.filter((t) => t.windowId === windowId2), byId = new Map(current.map((t) => [t.id, t]));
+  const recency = new Map(session2.mru.map((id, index) => [id, index]));
+  const sorted = [...current].sort(
+    (a, b) => Number(b.active) - Number(a.active) || (recency.get(a.id) ?? 1e9) - (recency.get(b.id) ?? 1e9) || a.index - b.index
+  );
+  const byURL = /* @__PURE__ */ new Map();
+  for (const tab of sorted) {
+    const key = canonical(tab.url ?? "");
+    if (key && !byURL.has(key)) byURL.set(key, tab);
+  }
+  return (b) => byId.get(session2.associations[windowId2]?.[b.id]) ?? byURL.get(canonical(b.url ?? "") ?? "");
+}
+
 // src/sidebar.ts
 var state;
+var sectionMode = "tabs";
+var downloads = new DownloadStore(chrome.downloads);
+downloads.watch(() => {
+  if (state && sectionMode === "downloads") render();
+});
 var port;
 var rendering = false;
 var again = false;
@@ -1316,6 +1472,26 @@ function render() {
     state.session
   );
   root.replaceChildren();
+  const tabsNav = el("nav", "", "surface-tabs");
+  tabsNav.ariaLabel = "Sidebar views";
+  for (const mode of ["tabs", "downloads"]) {
+    const control = button(mode === "tabs" ? "Tabs" : "Downloads", () => {
+      sectionMode = mode;
+      render();
+    });
+    control.setAttribute("aria-pressed", String(sectionMode === mode));
+    tabsNav.append(control);
+  }
+  root.append(tabsNav);
+  if (sectionMode === "downloads") {
+    const scroll2 = el("div", "", "scroll");
+    scroll2.append(downloadsView(downloads, state.windowId));
+    root.append(scroll2);
+    if (focused)
+      root.querySelector('[data-key="' + CSS.escape(focused) + '"]')?.focus();
+    scroll2.scrollTop = oldScroll;
+    return;
+  }
   const header = el("header");
   header.append(
     button(
@@ -1386,7 +1562,7 @@ function render() {
       )
     );
     if (t) tile.classList.add("is-open");
-    tile.title = tile.ariaLabel = b.title + " \u2014 " + b.url + (t?.url && t.url !== b.url ? " \xB7 Current: " + t.url : "");
+    tile.title = tile.ariaLabel = (state.prefs.customizations?.[b.id]?.name || b.title) + " \u2014 " + b.url + (t?.url && t.url !== b.url ? " \xB7 Current: " + t.url : "");
     tile.dataset.key = "fav-" + id;
     tile.onkeydown = (e) => {
       if (e.key === "ContextMenu" || e.shiftKey && e.key === "F10") {
@@ -1506,7 +1682,7 @@ function render() {
       )
     );
     target.dataset.key = "bm-" + b.id;
-    target.title = b.title + (b.url ? " \u2014 " + b.url : "") + (t?.url && t.url !== b.url ? " \xB7 Current: " + t.url : "");
+    target.title = (state.prefs.customizations?.[b.id]?.name || b.title) + (b.url ? " \u2014 " + b.url : "") + (t?.url && t.url !== b.url ? " \xB7 Current: " + t.url : "");
     if (!b.url) target.setAttribute("aria-expanded", String(expanded));
     target.onkeydown = (e) => {
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {

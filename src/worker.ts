@@ -154,6 +154,7 @@ chrome.runtime.onStartup.addListener(() => {
   });
 });
 interface Message {
+  downloadId?: number;
   appearance?: Appearance;
   action: string;
   targetId?: string;
@@ -186,6 +187,23 @@ async function run(m: Message): Promise<unknown> {
     return chrome.tabs.get(m.tabId);
   };
   switch (m.action) {
+    case "downloads":
+      if (w === undefined) throw new Error("No originating window.");
+      return openURL(internal.downloads, w, true);
+    case "reveal-download": {
+      if (!Number.isInteger(m.downloadId))
+        throw new Error("Choose a download.");
+      const [item] = await chrome.downloads.search({
+        id: m.downloadId,
+        limit: 1,
+      });
+      if (!item || item.state !== "complete" || !item.exists)
+        throw new Error(
+          "This file is missing or not complete. Manage it in Chrome.",
+        );
+      chrome.downloads.show(item.id);
+      return;
+    }
     case "customize": {
       const appearance = validateAppearance(m.appearance);
       if (m.bookmarkId) {

@@ -22,6 +22,7 @@ export function enteredURL(value: string): string | null {
   return null;
 }
 export const internal = {
+  downloads: "chrome://downloads/",
   newTab: "chrome://newtab/",
   shortcuts: "chrome://extensions/shortcuts",
 } as const;

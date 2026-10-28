@@ -878,3 +878,70 @@ footer button {
   padding: 6px;
   box-sizing: border-box;
 }
+.surface-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 10px 0;
+}
+.surface-tabs button {
+  flex: 1;
+  border-radius: 8px;
+  padding: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.surface-tabs button[aria-pressed="true"] {
+  background: var(--selected);
+  color: var(--text);
+}
+.downloads-view {
+  padding: 10px;
+}
+.download-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.download-heading h2 {
+  font-size: 14px;
+}
+.download-heading button {
+  font-size: 11px;
+  color: var(--muted);
+}
+.download-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 2px;
+  border-bottom: 1px solid var(--line);
+}
+.download-row > .ui-icon {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  color: var(--muted);
+}
+.download-copy {
+  min-width: 0;
+  flex: 1;
+}
+.download-copy .row-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.download-copy progress {
+  width: 100%;
+  height: 4px;
+  accent-color: var(--accent);
+}
+.download-reveal {
+  font-size: 11px;
+  padding: 6px;
+  border-radius: 6px;
+}
+button:disabled {
+  opacity: 0.45;
+}

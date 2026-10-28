@@ -1,3 +1,4 @@
+import { DownloadStore, downloadStatus } from "./downloads";
 import { icon, siteIcon } from "./icons";
 import {
   snapshot,
@@ -22,7 +23,23 @@ import {
 let state: Snapshot;
 let selected = 0;
 let results: Entry[] = [];
+const downloads = new DownloadStore(chrome.downloads);
 const catalog = new SearchCatalog();
+let downloadIDs: string[] = [];
+downloads.watch(() => {
+  for (const id of downloadIDs) catalog.index.remove("download", id);
+  downloadIDs = downloads.items.map((d) => String(d.id));
+  catalog.index.upsert(
+    downloads.items.map((d) => ({
+      id: String(d.id),
+      kind: "download" as const,
+      title: d.name,
+      detail: downloadStatus(d),
+      aliases: "download file",
+    })),
+  );
+  if (state) render();
+});
 const index = catalog.index;
 const input = document.querySelector<HTMLInputElement>("#query")!,
   list = document.querySelector<HTMLElement>("#results")!;
@@ -62,16 +79,19 @@ function render() {
         ? state.session.tabCustomizations?.[result.id]
         : state.prefs.customizations?.[result.id];
     symbol.append(
-      result.kind === "command"
-        ? icon("command")
-        : result.kind === "folder" && !appearance?.image && !appearance?.emoji
-          ? icon("folder")
-          : siteIcon(
-              result.title,
-              result.url ?? state.tabs.find((t) => t.id === result.tabId)?.url,
-              appearance?.emoji,
-              appearance?.image,
-            ),
+      result.kind === "download"
+        ? icon("download")
+        : result.kind === "command"
+          ? icon("command")
+          : result.kind === "folder" && !appearance?.image && !appearance?.emoji
+            ? icon("folder")
+            : siteIcon(
+                result.title,
+                result.url ??
+                  state.tabs.find((t) => t.id === result.tabId)?.url,
+                appearance?.emoji,
+                appearance?.image,
+              ),
     );
     const copy = el("span", "", "result-copy");
     copy.append(
@@ -79,15 +99,21 @@ function render() {
       el("span", result.detail, "result-detail"),
     );
     const action =
-      result.kind === "tab" || result.open
-        ? "Switch tab"
-        : result.kind === "bookmark"
-          ? "Open bookmark"
-          : result.kind === "folder"
-            ? "Reveal folder"
-            : result.kind === "url"
-              ? "Open URL"
-              : "Run command";
+      result.kind === "download"
+        ? downloads.items.find((d) => String(d.id) === result.id)?.exists &&
+          downloads.items.find((d) => String(d.id) === result.id)?.state ===
+            "complete"
+          ? "Reveal file"
+          : "Manage download"
+        : result.kind === "tab" || result.open
+          ? "Switch tab"
+          : result.kind === "bookmark"
+            ? "Open bookmark"
+            : result.kind === "folder"
+              ? "Reveal folder"
+              : result.kind === "url"
+                ? "Open URL"
+                : "Run command";
     row.append(symbol, copy, el("span", action, "result-action"));
     row.onpointermove = (e) => {
       if (e.movementX || e.movementY) {
@@ -119,6 +145,14 @@ function render() {
   select();
 }
 function select() {
+  const kind = results[selected]?.kind;
+  const freshHint = document.querySelector<HTMLElement>("#fresh-hint");
+  if (freshHint)
+    freshHint.hidden = !["tab", "bookmark", "url"].includes(kind ?? "");
+  const hint = document.querySelector("#enter-hint");
+  if (hint)
+    hint.textContent = kind === "download" ? "↵ Reveal / manage" : "↵ Open";
+
   [...list.querySelectorAll<HTMLElement>(".result")].forEach((e, i) => {
     e.classList.toggle("selected", i === selected);
     e.setAttribute("aria-selected", String(i === selected));
@@ -126,6 +160,15 @@ function select() {
   input.setAttribute("aria-activedescendant", "result-" + selected);
 }
 async function execute(e: Entry, fresh: boolean) {
+  if (e.kind === "download") {
+    const d = downloads.items.find((d) => String(d.id) === e.id);
+    await request(
+      d?.state === "complete" && d.exists ? "reveal-download" : "downloads",
+      { downloadId: Number(e.id), windowId: state.windowId },
+    );
+    window.close();
+    return;
+  }
   if (e.kind === "command") {
     await runCommand(e.id as CommandId, state);
     return;

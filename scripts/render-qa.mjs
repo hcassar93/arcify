@@ -126,6 +126,26 @@ try {
       });
     }
     if (pageName === "sidebar") {
+      await page
+        .getByRole("button", { name: "Downloads", exact: true })
+        .click();
+      await page.getByText("Brand guidelines.pdf", { exact: true }).waitFor();
+      check(
+        await page.getByText("File missing", { exact: false }).isVisible(),
+        "downloads: missing file state is explicit",
+      );
+      check(
+        (await page.getByRole("progressbar").count()) === 1,
+        "downloads: active progress is accessible",
+      );
+      for (const mode of ["light", "dark"]) {
+        await page.emulateMedia({ colorScheme: mode });
+        await page.screenshot({
+          animations: "disabled",
+          path: `docs/qa/arcify-downloads-${mode}.png`,
+        });
+      }
+      await page.getByRole("button", { name: "Tabs", exact: true }).click();
       const tileImage = page.locator(".tile .site-icon img").first();
       check(
         await tileImage.evaluate((img) => {
@@ -153,6 +173,12 @@ try {
           .isVisible(),
         "appearance editor offers explicit reset",
       );
+      for (const [width,height] of [[128,32],[32,128],[64,64]]) {
+        const data=await page.evaluate(([w,h])=>{const c=document.createElement("canvas");c.width=w;c.height=h;const ctx=c.getContext("2d");ctx.fillStyle="#9875b5";ctx.fillRect(0,0,w,h);return c.toDataURL("image/png").split(",")[1];},[width,height]);
+        await page.locator('input[type="file"]').setInputFiles({name:"synthetic.png",mimeType:"image/png",buffer:Buffer.from(data,"base64")});
+        await page.waitForFunction(()=>document.querySelector(".appearance-preview img")?.complete);
+        check(await page.locator(".appearance-preview img").evaluate(img=>{const a=img.getBoundingClientRect(),b=img.parentElement.getBoundingClientRect();return a.width<=b.width&&a.height<=b.height&&img.naturalWidth>0;}),"appearance: contained raster "+width+"x"+height);
+      }
       await page.getByRole("button", { name: "Cancel", exact: true }).click();
 
       await page.evaluate(() =>
@@ -244,6 +270,15 @@ try {
         "sidebar: malicious-looking title stays text",
       );
     } else {
+      await page.locator("#query").fill("Brand guidelines");
+      check(
+        await page.getByText("Reveal file", { exact: true }).isVisible(),
+        "palette: completed download offers reveal semantics",
+      );
+      await page.screenshot({
+        animations: "disabled",
+        path: "docs/qa/arcify-downloads-palette.png",
+      });
       await page.locator("#query").fill(">");
       check(
         await page

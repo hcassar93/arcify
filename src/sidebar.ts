@@ -1,3 +1,5 @@
+import { DownloadStore } from "./downloads";
+import { downloadsView } from "./downloads-ui";
 import { icon, siteIcon } from "./icons";
 import { treeRows, pageRange, type TreeRow } from "./tree-view";
 import {
@@ -24,6 +26,11 @@ import {
   menu,
 } from "./ui";
 let state: Snapshot;
+let sectionMode: "tabs" | "downloads" = "tabs";
+const downloads = new DownloadStore(chrome.downloads);
+downloads.watch(() => {
+  if (state && sectionMode === "downloads") render();
+});
 let port: chrome.runtime.Port;
 let rendering = false;
 let again = false;
@@ -205,6 +212,29 @@ function render() {
     state.session,
   );
   root.replaceChildren();
+  const tabsNav = el("nav", "", "surface-tabs");
+  tabsNav.ariaLabel = "Sidebar views";
+  for (const mode of ["tabs", "downloads"] as const) {
+    const control = button(mode === "tabs" ? "Tabs" : "Downloads", () => {
+      sectionMode = mode;
+      render();
+    });
+    control.setAttribute("aria-pressed", String(sectionMode === mode));
+    tabsNav.append(control);
+  }
+  root.append(tabsNav);
+  if (sectionMode === "downloads") {
+    const scroll = el("div", "", "scroll");
+    scroll.append(downloadsView(downloads, state.windowId));
+    root.append(scroll);
+    if (focused)
+      root
+        .querySelector<HTMLElement>('[data-key="' + CSS.escape(focused) + '"]')
+        ?.focus();
+    scroll.scrollTop = oldScroll;
+    return;
+  }
+
   const header = el("header");
   header.append(
     button(
@@ -280,7 +310,7 @@ function render() {
     );
     if (t) tile.classList.add("is-open");
     tile.title = tile.ariaLabel =
-      b.title +
+      (state.prefs.customizations?.[b.id]?.name || b.title) +
       " — " +
       b.url +
       (t?.url && t.url !== b.url ? " · Current: " + t.url : "");
@@ -421,7 +451,7 @@ function render() {
     );
     target.dataset.key = "bm-" + b.id;
     target.title =
-      b.title +
+      (state.prefs.customizations?.[b.id]?.name || b.title) +
       (b.url ? " — " + b.url : "") +
       (t?.url && t.url !== b.url ? " · Current: " + t.url : "");
     if (!b.url) target.setAttribute("aria-expanded", String(expanded));

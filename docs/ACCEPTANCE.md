@@ -26,7 +26,7 @@ Status on 2026-10-28: **1 pass, 0 observed native failures, 23 incomplete/blocke
 | A20 | Blocked | No runtime clients/assets; offline listing/switching in real Chrome not tested. |
 | A21 | Blocked | Source/build client/resource scans and CSP pass. No extension-page or service-worker runtime traffic trace captured. |
 | A22 | Incomplete | Unsafe schemes/credentials rejected; textContent-only rendering audit passes. Malicious-title rendered native test pending. |
-| A23 | Pass | Source and built manifest exactly tabs/bookmarks/storage/sidePanel/favicon, incognito disabled, no hosts/content scripts/remote resources. npm run audit:build passes. |
+| A23 | Pass | Source and built manifest exactly tabs/bookmarks/storage/sidePanel/favicon/downloads, incognito disabled, no hosts/content scripts/remote resources. npm run audit:build passes. |
 | A24 | Incomplete | Search computation p95 in qa/benchmark.json meets 50 ms. DOM update/typing/scrolling p95 in installed Chrome not measured. |
 
 ## Native completion procedure
@@ -36,3 +36,7 @@ Use a new disposable profile, load `dist` through chrome://extensions, and recor
 Run all A01–A24 scenarios, then reload the final build and repeat the full visual pass and regression. For A21 inspect DevTools Network for popup, sidebar, options and worker during startup, idle, query typing, folder expansion, theme changes and tab switching. Distinguish user-requested site traffic. For A15/A16 separately test browser-window fullscreen and website fullscreen. For A17 terminate the worker through Chrome's own tools and rapidly toggle; for A18 fully quit only the disposable Chrome process and restart that profile.
 
 Do not change the user's production profile, disable security policy, add testing permissions, or use headless results as a substitute for these native gates.
+
+## Requested additions
+
+Cached favicon handling, local appearance validation/reset/cleanup and Downloads metadata/ranking/reveal guards have automated coverage. Synthetic previews show both themes, progress/missing-file states and the editor. Native favicon cache behavior, file-manager reveal, permission prompts and file-existence race behavior are still unverified. These additions do not change the 1 static pass / 23 incomplete original acceptance count.

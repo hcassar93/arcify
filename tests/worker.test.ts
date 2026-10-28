@@ -35,7 +35,15 @@ const area = (data: Record<string, unknown>) => ({
   set: async (value: Record<string, unknown>) =>
     Object.assign(data, structuredClone(value)),
 });
+let missingDownload = false;
+const revealed: number[] = [];
 const chromeMock = {
+  downloads: {
+    search: async () => [
+      { id: 1, state: "complete", exists: !missingDownload },
+    ],
+    show: (id: number) => revealed.push(id),
+  },
   runtime: {
     id: "ox-test",
     onConnect: event(),
@@ -191,4 +199,40 @@ test("worker save only mutates after explicit message", async () => {
   });
   assert.equal(result.ok, true);
   assert.equal(bookmarks.length, count + 1);
+});
+
+test("worker reveal validates current download without opening a file", async () => {
+  assert.equal((await send("reveal-download", { downloadId: 1 })).ok, true);
+  assert.deepEqual(revealed, [1]);
+  missingDownload = true;
+  assert.equal((await send("reveal-download", { downloadId: 1 })).ok, false);
+  assert.deepEqual(revealed, [1]);
+});
+test("worker local appearance leaves native title unchanged and resets cleanly", async () => {
+  const original = bookmarks.find((b) => b.id === "a")!.title;
+  assert.equal(
+    (
+      await send("customize", {
+        bookmarkId: "a",
+        appearance: { name: "Local alias", emoji: "🌿" },
+      })
+    ).ok,
+    true,
+  );
+  assert.equal(bookmarks.find((b) => b.id === "a")!.title, original);
+  assert.equal(
+    (local.preferences as { customizations: Record<string, { name: string }> })
+      .customizations.a.name,
+    "Local alias",
+  );
+  assert.equal(
+    (await send("customize", { bookmarkId: "a", appearance: {} })).ok,
+    true,
+  );
+  assert.equal(
+    "a" in
+      (local.preferences as { customizations: Record<string, unknown> })
+        .customizations,
+    false,
+  );
 });

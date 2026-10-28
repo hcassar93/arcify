@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 const manifest = JSON.parse(await readFile("dist/manifest.json", "utf8"));
 assert.deepEqual(manifest.permissions.sort(), [
   "bookmarks",
+  "downloads",
   "favicon",
   "sidePanel",
   "storage",

@@ -1,5 +1,88 @@
+// src/downloads.ts
+var DOWNLOAD_LIMIT = 50;
+function summarizeDownload(d) {
+  return {
+    id: d.id,
+    name: d.filename.split(/[\\/]/).at(-1) || "Unnamed download",
+    state: d.state,
+    paused: d.paused,
+    exists: d.exists,
+    received: Math.max(0, d.bytesReceived),
+    total: d.totalBytes,
+    start: d.startTime,
+    danger: d.danger
+  };
+}
+function downloadStatus(d) {
+  if (d.state === "complete") return d.exists ? "Complete" : "File missing";
+  if (d.state === "interrupted") return "Interrupted \xB7 manage in Chrome";
+  if (d.paused) return "Paused";
+  return d.total > 0 ? Math.min(100, Math.round(d.received / d.total * 100)) + "% downloaded" : "Downloading\u2026";
+}
+var DownloadStore = class {
+  constructor(api) {
+    this.api = api;
+  }
+  items = [];
+  error = "";
+  listeners = /* @__PURE__ */ new Set();
+  timer;
+  running = false;
+  again = false;
+  async refresh() {
+    if (this.running) {
+      this.again = true;
+      return;
+    }
+    this.running = true;
+    try {
+      this.items = (await this.api.search({
+        limit: DOWNLOAD_LIMIT,
+        orderBy: ["-startTime"]
+      })).filter((d) => !d.incognito).slice(0, DOWNLOAD_LIMIT).map(summarizeDownload);
+      this.error = "";
+    } catch {
+      this.error = "Downloads are unavailable. Try again.";
+    } finally {
+      this.running = false;
+      this.listeners.forEach((fn) => fn());
+      if (this.again) {
+        this.again = false;
+        void this.refresh();
+      }
+    }
+  }
+  watch(fn) {
+    this.listeners.add(fn);
+    const changed = () => {
+      clearTimeout(this.timer);
+      this.timer = setTimeout(() => void this.refresh(), 100);
+    };
+    this.api.onCreated.addListener(changed);
+    this.api.onChanged.addListener(changed);
+    this.api.onErased.addListener(changed);
+    const interval = setInterval(() => {
+      if (this.items.some((d) => d.state === "in_progress" && !d.paused))
+        changed();
+    }, 1e3);
+    window.addEventListener(
+      "pagehide",
+      () => {
+        clearInterval(interval);
+        clearTimeout(this.timer);
+        this.api.onCreated.removeListener(changed);
+        this.api.onChanged.removeListener(changed);
+        this.api.onErased.removeListener(changed);
+      },
+      { once: true }
+    );
+    void this.refresh();
+  }
+};
+
 // src/icons.ts
 var paths = {
+  download: "M8 1v9 M4 6l4 4 4-4 M2 11v3h12v-3",
   search: "m14 14-4-4 M11.5 6.5a5 5 0 1 1-10 0 5 5 0 0 1 10 0",
   folder: "M1 3h5l2 2h7v9H1Z",
   chevron: "m6 4 4 4-4 4",
@@ -682,6 +765,11 @@ var SearchIndex = class {
 
 // src/commands.ts
 var commands = [
+  {
+    id: "downloads",
+    label: "Manage downloads in Chrome",
+    aliases: "downloads files recent"
+  },
   { id: "new-tab", label: "New blank tab", aliases: "new tab create" },
   { id: "toggle-sidebar", label: "Toggle sidebar", aliases: "panel show hide" },
   { id: "show-sidebar", label: "Show sidebar", aliases: "panel open" },
@@ -836,7 +924,23 @@ var SearchCatalog = class {
         kind: b.url ? "bookmark" : "folder",
         title: s.prefs.customizations?.[id]?.name || b.title || "Untitled",
         aliases: b.title,
-        detail: [b.path, b.url].filter(Boolean).join(" \xB7 "),
+        detail: [
+          (() => {
+            const names = [];
+            let parent = all.get(b.parentId);
+            const seen = /* @__PURE__ */ new Set();
+            while (parent && !seen.has(parent.id)) {
+              seen.add(parent.id);
+              if (parent.title)
+                names.unshift(
+                  s.prefs.customizations?.[parent.id]?.name || parent.title
+                );
+              parent = all.get(parent.parentId);
+            }
+            return names.join(" / ");
+          })(),
+          b.url
+        ].filter(Boolean).join(" \xB7 "),
         url: b.url,
         tabId: tab?.id,
         open: !!tab,
@@ -1292,7 +1396,23 @@ function appearanceEditor(s, bookmarkId, tabId) {
 var state;
 var selected = 0;
 var results = [];
+var downloads = new DownloadStore(chrome.downloads);
 var catalog = new SearchCatalog();
+var downloadIDs = [];
+downloads.watch(() => {
+  for (const id of downloadIDs) catalog.index.remove("download", id);
+  downloadIDs = downloads.items.map((d) => String(d.id));
+  catalog.index.upsert(
+    downloads.items.map((d) => ({
+      id: String(d.id),
+      kind: "download",
+      title: d.name,
+      detail: downloadStatus(d),
+      aliases: "download file"
+    }))
+  );
+  if (state) render();
+});
 var index = catalog.index;
 var input = document.querySelector("#query");
 var list = document.querySelector("#results");
@@ -1329,7 +1449,7 @@ function render() {
     const symbol = el("span", "", "result-icon");
     const appearance = result.kind === "tab" ? state.session.tabCustomizations?.[result.id] : state.prefs.customizations?.[result.id];
     symbol.append(
-      result.kind === "command" ? icon("command") : result.kind === "folder" && !appearance?.image && !appearance?.emoji ? icon("folder") : siteIcon(
+      result.kind === "download" ? icon("download") : result.kind === "command" ? icon("command") : result.kind === "folder" && !appearance?.image && !appearance?.emoji ? icon("folder") : siteIcon(
         result.title,
         result.url ?? state.tabs.find((t) => t.id === result.tabId)?.url,
         appearance?.emoji,
@@ -1341,7 +1461,7 @@ function render() {
       el("span", result.title, "result-title"),
       el("span", result.detail, "result-detail")
     );
-    const action = result.kind === "tab" || result.open ? "Switch tab" : result.kind === "bookmark" ? "Open bookmark" : result.kind === "folder" ? "Reveal folder" : result.kind === "url" ? "Open URL" : "Run command";
+    const action = result.kind === "download" ? downloads.items.find((d) => String(d.id) === result.id)?.exists && downloads.items.find((d) => String(d.id) === result.id)?.state === "complete" ? "Reveal file" : "Manage download" : result.kind === "tab" || result.open ? "Switch tab" : result.kind === "bookmark" ? "Open bookmark" : result.kind === "folder" ? "Reveal folder" : result.kind === "url" ? "Open URL" : "Run command";
     row.append(symbol, copy, el("span", action, "result-action"));
     row.onpointermove = (e) => {
       if (e.movementX || e.movementY) {
@@ -1373,6 +1493,13 @@ function render() {
   select();
 }
 function select() {
+  const kind = results[selected]?.kind;
+  const freshHint = document.querySelector("#fresh-hint");
+  if (freshHint)
+    freshHint.hidden = !["tab", "bookmark", "url"].includes(kind ?? "");
+  const hint = document.querySelector("#enter-hint");
+  if (hint)
+    hint.textContent = kind === "download" ? "\u21B5 Reveal / manage" : "\u21B5 Open";
   [...list.querySelectorAll(".result")].forEach((e, i) => {
     e.classList.toggle("selected", i === selected);
     e.setAttribute("aria-selected", String(i === selected));
@@ -1380,6 +1507,15 @@ function select() {
   input.setAttribute("aria-activedescendant", "result-" + selected);
 }
 async function execute(e, fresh) {
+  if (e.kind === "download") {
+    const d = downloads.items.find((d2) => String(d2.id) === e.id);
+    await request(
+      d?.state === "complete" && d.exists ? "reveal-download" : "downloads",
+      { downloadId: Number(e.id), windowId: state.windowId }
+    );
+    window.close();
+    return;
+  }
   if (e.kind === "command") {
     await runCommand(e.id, state);
     return;

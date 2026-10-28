@@ -1,84 +1,107 @@
 
-> ox-chrome@0.1.0 check
+> arcify@0.1.0 check
 > npm run typecheck && npm run lint && npm test && npm run build && npm run audit:build && npm run benchmark
 
 
-> ox-chrome@0.1.0 typecheck
+> arcify@0.1.0 typecheck
 > tsc --noEmit
 
 
-> ox-chrome@0.1.0 lint
+> arcify@0.1.0 lint
 > eslint src tests scripts
 
 
-> ox-chrome@0.1.0 test
+> arcify@0.1.0 test
 > node --import tsx --test tests/*.test.ts
 
-(node:98711) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-✔ reject destination javascript:alert(1) (0.724875ms)
-✔ reject destination data:text/html,test (0.060584ms)
-✔ reject destination file:///tmp/a (0.047417ms)
-✔ reject destination chrome-extension://abc/a (0.361375ms)
-✔ reject destination ftp://example.test (0.06375ms)
-✔ reject destination https://user:pass@example.test (0.049416ms)
-✔ reject destination https://user@example.test (0.043708ms)
-✔ reject destination custom:abc (0.037708ms)
-✔ only named internal actions allowed (0.103458ms)
-✔ canonical host and scheme but preserve meaningful URL components (0.125667ms)
-✔ explicit URLs and domain entry support ports and localhost (0.537166ms)
-✔ malformed optional preferences recover safely (0.483709ms)
-✔ favourites limit is 12 (0.070166ms)
-✔ associations survive navigation within original window (0.574833ms)
-✔ exact matching prefers active, then MRU, then native order (0.15375ms)
-✔ duplicate ownership favours favourite; extra live duplicate stays ordinary (0.13825ms)
-✔ closed and moved tab associations are pruned without removing bookmarks (0.154458ms)
-✔ rapid activation is single-flight and remembers existing exact match (0.210042ms)
-✔ adapter failure does not write false association and retry works (0.2565ms)
-✔ existing exact match is associated before later redirect (0.084167ms)
-✔ tree movement rejects cycles and managed targets (0.085541ms)
-✔ native tree order and descendant counts are preserved (0.100667ms)
-✔ ranking tiers outrank window recency (1.23425ms)
-✔ unicode matching, prefixes, duplicate result and no match handling (0.722875ms)
-✔ empty query limits recent tabs and excludes current (0.21225ms)
-✔ incremental search changes and bounded results (8.117167ms)
-(node:98712) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+✔ appearance validates names, rejects active images and recovers invalid optional settings (2.867875ms)
+✔ bookmark customizations persist while tab customizations are session-only and pruned (0.303792ms)
+✔ local image validation rejects SVG, oversized files and disguised raster files (0.797208ms)
 (Use `node --trace-deprecation ...` to show where the warning was created)
-✔ manifest has exactly the permission contract (0.722458ms)
-✔ CSP prevents extension remote resource and connection loads (0.087042ms)
-✔ source has no network clients, HTML injection, remote icons or sync storage (0.550959ms)
-✔ all URL navigation writes are centralized (0.258458ms)
-✔ production resources are local and no inline scripts (0.296583ms)
-✔ malicious display titles use textContent primitive (0.245209ms)
-(node:98713) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+✔ reject destination javascript:alert(1) (0.857041ms)
+✔ reject destination data:text/html,test (0.092292ms)
+✔ reject destination file:///tmp/a (0.053292ms)
+✔ reject destination chrome-extension://abc/a (0.186875ms)
+✔ reject destination ftp://example.test (0.072833ms)
+✔ reject destination https://user:pass@example.test (0.04625ms)
+✔ reject destination https://user@example.test (0.050666ms)
+✔ reject destination custom:abc (0.038834ms)
+✔ only named internal actions allowed (0.270833ms)
+✔ canonical host and scheme but preserve meaningful URL components (0.182125ms)
+✔ explicit URLs and domain entry support ports and localhost (0.601542ms)
+✔ malformed optional preferences recover safely (0.601ms)
+✔ favourites limit is 12 (0.112583ms)
+✔ associations survive navigation within original window (0.678667ms)
+✔ exact matching prefers active, then MRU, then native order (0.160916ms)
+✔ duplicate ownership favours favourite; extra live duplicate stays ordinary (0.202584ms)
+✔ closed and moved tab associations are pruned without removing bookmarks (0.154875ms)
+✔ rapid activation is single-flight and remembers existing exact match (0.220209ms)
+✔ adapter failure does not write false association and retry works (0.272042ms)
+✔ existing exact match is associated before later redirect (0.084125ms)
+✔ tree movement rejects cycles and managed targets (0.085791ms)
+✔ native tree order and descendant counts are preserved (0.112167ms)
+✔ ranking tiers outrank window recency (0.731709ms)
+✔ unicode matching, prefixes, duplicate result and no match handling (0.399709ms)
+✔ empty query limits recent tabs and excludes current (0.165458ms)
+✔ incremental search changes and bounded results (8.260917ms)
 (Use `node --trace-deprecation ...` to show where the warning was created)
-✔ worker startup is read-only for bookmarks and tabs (0.963917ms)
-✔ worker activation serializes concurrent clicks, persists redirects, reset is explicit (0.650209ms)
-✔ worker deliberate fresh activation creates exactly one additional tab (0.102125ms)
-✔ worker denied edit preserves bookmark and sends recoverable error (0.247208ms)
-✔ worker rejects bookmarklets before browser mutation (0.129166ms)
-✔ worker handles tab disappearing between search and execution (0.103583ms)
-✔ worker save only mutates after explicit message (0.114167ms)
-ℹ tests 39
+✔ download projection drops full paths and source URLs (0.521375ms)
+✔ download status and reveal guard cover progress, missing, paused and interrupted (0.1555ms)
+✔ download store bounds queries, excludes incognito and preserves state on API failure (0.619584ms)
+✔ download search ranks filenames locally and respects action-only mode (0.789833ms)
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✔ manifest has exactly the permission contract (0.792583ms)
+✔ CSP prevents extension remote resource and connection loads (0.101875ms)
+✔ source has no network clients, HTML injection, remote icons or sync storage (0.835459ms)
+✔ all URL navigation writes are centralized (0.342125ms)
+✔ production resources are local and no inline scripts (0.414417ms)
+✔ malicious display titles use textContent primitive (0.328334ms)
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✔ bookmark event edits preserve unaffected object identity and update descendant paths (0.922042ms)
+✔ bookmark move/create/reorder/remove maintain native ordering and subtree membership (0.31125ms)
+✔ external deletion removes a complete subtree and exposes missing root recovery (0.115167ms)
+✔ tab insertion, removal, activation and move preserve contiguous native ordering (0.249916ms)
+✔ relative same-folder moves account for removing source in both directions (0.717959ms)
+✔ relative placement rejects self, managed destinations and folder cycles (0.218291ms)
+✔ favourite before/after ordering has identical drag and keyboard semantics (0.107417ms)
+✔ collapsed folder reveals one active descendant, excluding favourites (0.16925ms)
+✔ large tree pages stay bounded and every item remains reachable in order (2.2735ms)
+✔ session validation rejects malformed identities and restores safe defaults (0.361042ms)
+✔ cached resolution matches reference resolver for duplicates and navigated associations (0.286667ms)
+✔ favicon mapping uses only packaged exact-host assets and rejects deceptive schemes/hosts (0.063291ms)
+✔ catalog applies rename, move, removal and association deltas without full replacement (1.595666ms)
+✔ cached favicon URL stays in the extension origin with encoded destination only (0.154ms)
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✔ worker startup is read-only for bookmarks and tabs (0.983958ms)
+✔ worker activation serializes concurrent clicks, persists redirects, reset is explicit (0.598459ms)
+✔ worker deliberate fresh activation creates exactly one additional tab (0.111084ms)
+✔ worker denied edit preserves bookmark and sends recoverable error (0.244708ms)
+✔ worker rejects bookmarklets before browser mutation (0.601542ms)
+✔ worker handles tab disappearing between search and execution (0.135542ms)
+✔ worker save only mutates after explicit message (0.138792ms)
+✔ worker reveal validates current download without opening a file (0.146416ms)
+✔ worker local appearance leaves native title unchanged and resets cleanly (0.239708ms)
+ℹ tests 62
 ℹ suites 0
-ℹ pass 39
+ℹ pass 62
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 150.266875
+ℹ duration_ms 172.480459
 
-> ox-chrome@0.1.0 build
+> arcify@0.1.0 build
 > node scripts/build.mjs
 
 Packaged local-only extension in dist/
 
-> ox-chrome@0.1.0 audit:build
+> arcify@0.1.0 audit:build
 > node scripts/audit-build.mjs
 
 Built permission/resource/network-client audit passed. Runtime traffic inspection is a separate native Chrome gate.
 
-> ox-chrome@0.1.0 benchmark
+> arcify@0.1.0 benchmark
 > node --import tsx tests/benchmark.ts
 
 {
@@ -89,9 +112,8 @@ Built permission/resource/network-client audit passed. Runtime traffic inspectio
   "bookmarks": 5000,
   "tabs": 500,
   "samples": 500,
-  "p95Ms": 2.554708000000005,
-  "maxMs": 3.315750000000037,
+  "p95Ms": 2.5398750000000234,
+  "maxMs": 2.9228329999999687,
   "scope": "Search computation only; popup rendering and installed Chrome latency remain unmeasured."
 }
-(node:98850) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)

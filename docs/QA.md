@@ -10,11 +10,11 @@ Date: 2026-10-28. This is not a release sign-off. The full brief is preserved un
 - Arc 1.157.0 installed; accessibility hierarchy inspected read-only. Private screenshot capture was denied and not retried.
 - Native display size not captured. Supplemental preview viewports: sidebar 360×760, palette 600×380, scale factor 2.
 - Build/source content hash: see qa/source-sha256.txt. Final exact Git commit and CI status are available on this repository's Actions run; reproduce with `git rev-parse HEAD` and the commands below.
-- Production manifest: tabs, bookmarks, storage, sidePanel, favicon; Chrome ≥142; incognito disabled.
+- Production manifest: tabs, bookmarks, storage, sidePanel, favicon, downloads; Chrome ≥142; incognito disabled.
 
 ## Results
 
-`npm run check` runs strict TypeScript, ESLint, 56 synthetic unit/security/worker tests, reproducible build, packaged permission/resource audit and the 500-run search benchmark. The seven worker tests use a Chrome API mock and are explicitly not installed-extension integration tests. See qa/test-results.txt and qa/benchmark.json for exact output.
+`npm run check` runs strict TypeScript, ESLint, 62 synthetic unit/security/worker tests, reproducible build, packaged permission/resource audit and the 500-run search benchmark. The seven worker tests use a Chrome API mock and are explicitly not installed-extension integration tests. See qa/test-results.txt and qa/benchmark.json for exact output.
 
 No runtime network inspection was possible. Static source/build checks find no network clients, remote resources, HTML injection or storage.sync. CSP disallows connections. This supports review but is not a universal network guarantee or a runtime trace.
 
@@ -33,7 +33,7 @@ Smallest next step: make the disposable QA Chrome process selectable by the supp
 
 Both images visibly say IMPLEMENTED UI PREVIEW and not installed-extension evidence. They contain only synthetic data. No fake browser frame was drawn. They cannot satisfy the required full-browser-frame screenshots or the two native visual QA passes.
 
-Preview review 1 detected headless minimum-viewport clipping on the sidebar. The preview harness was constrained to 360 CSS pixels, the screenshot was recaptured, and review 2 verified all four tiles and utility/footer controls. Palette review verified focus outline, hierarchy, truncated secondary content and action labels. These are supplemental preview reviews only. Dark, placement, fullscreen, context menus, errors and full native regression remain incomplete.
+Preview review 1 detected headless minimum-viewport clipping on the sidebar. The preview harness was constrained to 360 CSS pixels, the screenshot was recaptured, and review 2 verified all four tiles and utility/footer controls. Palette review verified focus outline, hierarchy, truncated secondary content and action labels. These are supplemental preview reviews only. Later synthetic passes cover dark theme, context menus, appearance editing and Downloads. Placement, fullscreen and full native regression remain incomplete.
 
 ## Reproduction
 
@@ -63,4 +63,10 @@ Known incomplete scope and precise acceptance outcomes are in ACCEPTANCE.md and 
 
 ## Continuation milestone
 
-Incremental stores/index updates, bounded saved/open rows and keyboard move equivalents are now implemented. 56 unit/security/mock tests and 29 rendered checks pass. Rendered system/light/dark changes, narrow columns, collapsed active child, cache hit/miss fixtures, IME/no-match, destination picker, malicious text and appearance editor are covered. Latest results: qa/render-results.json and qa/benchmark.json. The current light/dark sidebar, palette and editor images are synthetic implemented-UI previews. Folder icons now have 20px optical boxes; favourite icons use a 32px flex basis with containment, fixing clipping. Two preview reviews inspected the before/after pixels; native full-frame review remains blocked as above. Run `npm run preview && node scripts/render-qa.mjs` for the supplemental rendering checks.
+Incremental stores/index updates, bounded saved/open rows and keyboard move equivalents are now implemented. 62 unit/security/mock tests and 35 rendered checks pass. Rendered system/light/dark changes, narrow columns, collapsed active child, cache hit/miss fixtures, IME/no-match, destination picker, malicious text and appearance editor are covered. Latest results: qa/render-results.json and qa/benchmark.json. The current light/dark sidebar, palette and editor images are synthetic implemented-UI previews. Folder icons now have 20px optical boxes; favourite icons use a 32px flex basis with containment, fixing clipping. Two preview reviews inspected the before/after pixels; native full-frame review remains blocked as above. Run `npm run preview && node scripts/render-qa.mjs` for the supplemental rendering checks.
+
+## Final Downloads regression
+
+62 automated tests pass (including mock worker reveal rejection for missing files and local customization/reset); 35 synthetic rendered checks pass. Downloads light/dark, progress, missing files and palette semantics were captured and inspected. Wide/tall/square local raster images pass containment checks. No nonlocal requests or uncaught errors occurred in the synthetic page trace; this is not an extension service-worker traffic trace. The full original native acceptance count remains 1 static pass / 23 incomplete. Current code is published as a development preview, not release-certified.
+
+Exact commands: npm run check; npm run preview; node scripts/render-qa.mjs. The committed source-sha256.txt identifies the tested source/public payload; CI verifies the final commit and reproducible dist. Current screenshots are arcify-sidebar-light/dark.png, arcify-palette-light/dark.png, arcify-appearance-editor.png and arcify-downloads-light/dark/palette.png. All contain synthetic fixtures and explicit preview labels.
